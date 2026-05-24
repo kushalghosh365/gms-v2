@@ -11,7 +11,7 @@ const MemberList = () => {
   const [loading, setLoading] = useState(true);
   const [statusMessage, setStatusMessage] = useState({}); // { memberId: 'message' }
 
-  
+
   // Payment Modal State
   const [paymentModal, setPaymentModal] = useState({ show: false, phone: '', name: '' });
   const [selectedMonths, setSelectedMonths] = useState(1);
@@ -25,11 +25,11 @@ const MemberList = () => {
   const downloadQRCard = () => {
     if (cardRef.current) {
       setTimeout(() => {
-        html2canvas(cardRef.current, { 
-            useCORS: true,
-            scale: 2,
-            backgroundColor: "#ffffff",
-            logging: true
+        html2canvas(cardRef.current, {
+          useCORS: true,
+          scale: 2,
+          backgroundColor: "#ffffff",
+          logging: true
         }).then(canvas => {
           const link = document.createElement('a');
           link.download = `${qrModal.member.fullName}_QR_Card.png`;
@@ -38,8 +38,8 @@ const MemberList = () => {
           link.click();
           document.body.removeChild(link);
         }).catch(err => {
-            console.error('Error generating QR Card:', err);
-            alert('Failed to download QR Card. Please try again.');
+          console.error('Error generating QR Card:', err);
+          alert('Failed to download QR Card. Please try again.');
         });
       }, 500); // Increased delay to ensure rendering
     }
@@ -79,7 +79,7 @@ const MemberList = () => {
 
     try {
       await axios.post('/api/admin/manual-attendance', { phone, action });
-      
+
       // Show success feedback
       setStatusMessage(prev => ({ ...prev, [memberId]: `${action} Success!` }));
       setTimeout(() => {
@@ -98,8 +98,8 @@ const MemberList = () => {
 
   const submitManualPayment = async () => {
     try {
-      await axios.post('/api/admin/manual-payment', { 
-        phone: paymentModal.phone, 
+      await axios.post('/api/admin/manual-payment', {
+        phone: paymentModal.phone,
         months: selectedMonths,
         amount: paymentAmount
       });
@@ -123,15 +123,14 @@ const MemberList = () => {
           <h1 className="text-3xl font-black text-slate-900">Member Directory</h1>
           <p className="text-slate-500">Manage and track all registered gym members.</p>
         </div>
-        
+
         <div className="flex items-center space-x-2">
           {['All', 'Valid', 'Expired'].map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-                filter === f ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'
-              }`}
+              className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${filter === f ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-600 hover:bg-slate-50'
+                }`}
             >
               {f}
             </button>
@@ -153,33 +152,32 @@ const MemberList = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredMembers.map(m => (
           <div key={m._id} className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 hover:shadow-xl transition-all group relative overflow-hidden flex flex-col">
-             {/* Status Badge */}
-              <div className={`absolute top-0 right-0 px-4 py-1 rounded-bl-2xl text-[10px] font-black uppercase tracking-widest ${
-               m.membershipStatus === 'Valid' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'
-             }`}>
-               {m.membershipStatus}
-             </div>
+            {/* Status Badge */}
+            <div className={`absolute top-0 right-0 px-4 py-1 rounded-bl-2xl text-[10px] font-black uppercase tracking-widest ${m.membershipStatus === 'Valid' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'
+              }`}>
+              {m.membershipStatus}
+            </div>
 
-             {/* Action Feedback Message */}
-             {statusMessage[m._id] && (
-               <div className="absolute inset-0 bg-slate-900/10 backdrop-blur-[2px] flex items-center justify-center z-10 animate-in fade-in duration-300">
-                 <div className="bg-white px-4 py-2 rounded-2xl shadow-xl border border-slate-100 animate-in zoom-in slide-in-from-bottom-2 duration-300">
-                   <p className="text-sm font-black text-slate-900 flex items-center space-x-2">
-                     {statusMessage[m._id].includes('Already') ? (
-                       <XCircle size={16} className="text-orange-500" />
-                     ) : (
-                       <CheckCircle size={16} className="text-emerald-500" />
-                     )}
-                     <span>{statusMessage[m._id]}</span>
-                   </p>
-                 </div>
-               </div>
-             )}
+            {/* Action Feedback Message */}
+            {statusMessage[m._id] && (
+              <div className="absolute inset-0 bg-slate-900/10 backdrop-blur-[2px] flex items-center justify-center z-10 animate-in fade-in duration-300">
+                <div className="bg-white px-4 py-2 rounded-2xl shadow-xl border border-slate-100 animate-in zoom-in slide-in-from-bottom-2 duration-300">
+                  <p className="text-sm font-black text-slate-900 flex items-center space-x-2">
+                    {statusMessage[m._id].includes('Already') ? (
+                      <XCircle size={16} className="text-orange-500" />
+                    ) : (
+                      <CheckCircle size={16} className="text-emerald-500" />
+                    )}
+                    <span>{statusMessage[m._id]}</span>
+                  </p>
+                </div>
+              </div>
+            )}
 
 
             <div className="flex items-start space-x-4 mb-6">
-              <img 
-                src={m.photo ? `/${m.photo.replace(/\\/g, '/')}` : 'https://via.placeholder.com/60'} 
+              <img
+                src={m.photo ? `/${m.photo.replace(/\\/g, '/')}` : 'https://via.placeholder.com/60'}
                 crossOrigin={m.photo ? "anonymous" : undefined}
                 className="w-16 h-16 rounded-2xl object-cover border-2 border-slate-100 group-hover:scale-105 transition-transform"
                 alt={m.fullName}
@@ -187,7 +185,7 @@ const MemberList = () => {
               <div>
                 <h3 className="font-black text-xl text-slate-900 leading-tight flex items-center flex-wrap gap-2">
                   {m.fullName}
-                  <button 
+                  <button
                     onClick={() => setDetailsModal({ show: true, member: m })}
                     className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-full hover:bg-indigo-100 hover:text-indigo-600 transition flex items-center gap-1 uppercase tracking-wider font-bold"
                   >
@@ -214,15 +212,15 @@ const MemberList = () => {
             </div>
 
             {/* Admin Controls */}
-             <div className="mt-auto pt-4 border-t border-slate-100 grid grid-cols-3 gap-2">
-              <button 
+            <div className="mt-auto pt-4 border-t border-slate-100 grid grid-cols-3 gap-2">
+              <button
                 onClick={() => handleManualAttendance(m.phone, 'IN', m._id)}
                 className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 active:scale-95 active:bg-emerald-200 flex flex-col items-center justify-center transition-all duration-200 shadow-sm hover:shadow-md"
               >
                 <LogIn size={18} />
                 <span className="text-[10px] font-bold mt-1">IN</span>
               </button>
-              <button 
+              <button
                 onClick={() => handleManualAttendance(m.phone, 'OUT', m._id)}
                 className="p-2 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 active:scale-95 active:bg-orange-200 flex flex-col items-center justify-center transition-all duration-200 shadow-sm hover:shadow-md"
               >
@@ -230,7 +228,7 @@ const MemberList = () => {
                 <span className="text-[10px] font-bold mt-1">OUT</span>
               </button>
 
-              <button 
+              <button
                 onClick={() => {
                   setPaymentModal({ show: true, phone: m.phone, name: m.fullName });
                   setPaymentAmount(1000);
@@ -241,7 +239,7 @@ const MemberList = () => {
                 <DollarSign size={18} />
                 <span className="text-[10px] font-bold mt-1">PAID</span>
               </button>
-              <button 
+              <button
                 onClick={() => setQrModal({ show: true, member: m })}
                 className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 active:scale-95 active:bg-indigo-200 flex flex-col items-center justify-center transition-all duration-200 shadow-sm hover:shadow-md"
               >
@@ -257,58 +255,58 @@ const MemberList = () => {
       {qrModal.show && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl relative">
-            <button 
-                onClick={() => setQrModal({ show: false, member: null })}
-                className="absolute top-4 right-4 p-2 bg-slate-100 rounded-full hover:bg-slate-200"
+            <button
+              onClick={() => setQrModal({ show: false, member: null })}
+              className="absolute top-4 right-4 p-2 bg-slate-100 rounded-full hover:bg-slate-200"
             >
-                <X size={20} />
+              <X size={20} />
             </button>
-            
+
             <h2 className="text-xl font-bold mb-6 text-center">Member QR Card</h2>
-            
+
             <div className="flex justify-center mb-8">
-                <div 
-                    ref={cardRef}
-                    className="w-full rounded-3xl p-6 flex flex-col items-center text-center shadow-lg"
-                    style={{ 
-                        background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                        border: '1px solid #f1f5f9',
-                        backgroundColor: '#ffffff'
-                    }}
+              <div
+                ref={cardRef}
+                className="w-full rounded-3xl p-6 flex flex-col items-center text-center shadow-lg"
+                style={{
+                  background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                  border: '1px solid #f1f5f9',
+                  backgroundColor: '#ffffff'
+                }}
+              >
+                <div
+                  className="w-24 h-24 rounded-full overflow-hidden mb-4 shadow-md"
+                  style={{ border: '4px solid #e0e7ff' }}
                 >
-                    <div 
-                        className="w-24 h-24 rounded-full overflow-hidden mb-4 shadow-md"
-                        style={{ border: '4px solid #e0e7ff' }}
-                    >
-                        <img 
-                            src={qrModal.member.photo ? `/${qrModal.member.photo.replace(/\\/g, '/')}` : 'https://via.placeholder.com/150'} 
-                            crossOrigin={qrModal.member.photo ? "anonymous" : undefined}
-                            alt="Member" 
-                            className="w-full h-full object-cover" 
-                        />
-                    </div>
-                    <h3 className="text-xl font-bold mb-1" style={{ color: '#0f172a' }}>{qrModal.member.fullName}</h3>
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-6" style={{ color: '#4f46e5' }}>GYM MEMBER</p>
-                    
-                    <div className="p-3 rounded-2xl shadow-inner mb-4" style={{ backgroundColor: '#ffffff', border: '1px solid #f8fafc' }}>
-                        <QRCodeCanvas 
-                            value={qrModal.member.phone} 
-                            size={160} 
-                            level="H"
-                            includeMargin={false}
-                        />
-                    </div>
-                    
-                    <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94a3b8' }}>Scan for Attendance</p>
+                  <img
+                    src={qrModal.member.photo ? `/${qrModal.member.photo.replace(/\\/g, '/')}` : 'https://via.placeholder.com/150'}
+                    crossOrigin={qrModal.member.photo ? "anonymous" : undefined}
+                    alt="Member"
+                    className="w-full h-full object-cover"
+                  />
                 </div>
+                <h3 className="text-xl font-bold mb-1" style={{ color: '#0f172a' }}>{qrModal.member.fullName}</h3>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-6" style={{ color: '#4f46e5' }}>GYM MEMBER</p>
+
+                <div className="p-3 rounded-2xl shadow-inner mb-4" style={{ backgroundColor: '#ffffff', border: '1px solid #f8fafc' }}>
+                  <QRCodeCanvas
+                    value={qrModal.member.phone}
+                    size={160}
+                    level="H"
+                    includeMargin={false}
+                  />
+                </div>
+
+                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#94a3b8' }}>Scan for Attendance</p>
+              </div>
             </div>
 
-            <button 
-                onClick={downloadQRCard}
-                className="w-full flex items-center justify-center space-x-2 p-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-100"
+            <button
+              onClick={downloadQRCard}
+              className="w-full flex items-center justify-center space-x-2 p-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-100"
             >
-                <Download size={20} />
-                <span>Download Image</span>
+              <Download size={20} />
+              <span>Download Image</span>
             </button>
           </div>
         </div>
@@ -323,13 +321,13 @@ const MemberList = () => {
               <button onClick={() => setPaymentModal({ show: false, phone: '', name: '' })}><X size={24} /></button>
             </div>
             <p className="text-slate-600 mb-4">Marking cash payment for <span className="font-bold text-slate-900">{paymentModal.name}</span></p>
-            
+
             <div className="space-y-4 mb-6">
               <p className="text-sm font-bold text-slate-500">Select Months:</p>
               <div className="grid grid-cols-2 gap-3">
                 {[1, 3, 6, 12].map(m => (
-                  <button 
-                    key={m} 
+                  <button
+                    key={m}
                     onClick={() => {
                       setSelectedMonths(m);
                       setPaymentAmount(m * 1000);
@@ -344,7 +342,7 @@ const MemberList = () => {
 
             <div className="space-y-2 mb-8">
               <p className="text-sm font-bold text-slate-500">Amount (₹):</p>
-              <input 
+              <input
                 type="number"
                 value={paymentAmount}
                 onChange={(e) => setPaymentAmount(e.target.value)}
@@ -352,7 +350,7 @@ const MemberList = () => {
               />
             </div>
 
-            <button 
+            <button
               onClick={submitManualPayment}
               className="w-full p-4 bg-indigo-600 text-white rounded-2xl font-black text-lg shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
             >
@@ -372,8 +370,8 @@ const MemberList = () => {
             </div>
             <div className="p-8 space-y-4">
               <div className="flex items-center gap-6 mb-6 pb-6 border-b border-slate-100">
-                <img 
-                  src={detailsModal.member.photo ? `/${detailsModal.member.photo.replace(/\\/g, '/')}` : 'https://via.placeholder.com/100'} 
+                <img
+                  src={detailsModal.member.photo ? `/${detailsModal.member.photo.replace(/\\/g, '/')}` : 'https://via.placeholder.com/100'}
                   crossOrigin={detailsModal.member.photo ? "anonymous" : undefined}
                   className="w-24 h-24 rounded-2xl object-cover border-4 border-slate-50 shadow-sm"
                   alt="Profile"
@@ -385,7 +383,7 @@ const MemberList = () => {
                   </span>
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Phone Number</p>
