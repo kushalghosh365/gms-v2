@@ -1,10 +1,10 @@
 import React, { useState, useRef } from 'react';
 import axios from 'axios';
-import { UserPlus, Upload, CheckCircle, Download } from 'lucide-react';
+import { UserPlus, Upload, CheckCircle, Download, Clock } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
 const MemberRegistration = () => {
-  const [userType, setUserType] = useState('MEMBER');
+  const [userType, setUserType] = useState('MEMBER'); // MEMBER | OLD_MEMBER | STAFF
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -22,6 +22,7 @@ const MemberRegistration = () => {
       .then(res => setSettings(res.data))
       .catch(err => console.error(err));
   }, []);
+
   const [photo, setPhoto] = useState(null);
   const [loading, setLoading] = useState(false);
   const [successData, setSuccessData] = useState(null);
@@ -35,23 +36,30 @@ const MemberRegistration = () => {
     Object.keys(formData).forEach(key => data.append(key, formData[key]));
     if (photo) data.append('photo', photo);
 
-    if (userType === 'MEMBER' && settings) {
-      let admissionFee = 0;
-      let packageFee = 0;
-      const catObj = settings.pricing.find(c => c.category === formData.memberCategory);
-      if (catObj) {
-        admissionFee = catObj.admissionFee;
-        const pkgObj = catObj.packages.find(p => p.name === formData.packageType) || catObj.packages[0];
-        if (pkgObj) packageFee = pkgObj.price;
-      }
-      data.append('admissionFeePaid', admissionFee);
-      data.append('packageFeePaid', packageFee);
-    }
-
     try {
-      const endpoint = userType === 'STAFF' ? '/api/staff/register' : '/api/members/register';
-      const response = await axios.post(endpoint, data);
+      let endpoint;
+      if (userType === 'STAFF') {
+        endpoint = '/api/staff/register';
+      } else if (userType === 'OLD_MEMBER') {
+        endpoint = '/api/members/register-old';
+      } else {
+        // New MEMBER — append fees
+        endpoint = '/api/members/register';
+        if (settings) {
+          let admissionFee = 0;
+          let packageFee = 0;
+          const catObj = settings.pricing.find(c => c.category === formData.memberCategory);
+          if (catObj) {
+            admissionFee = catObj.admissionFee;
+            const pkgObj = catObj.packages.find(p => p.name === formData.packageType) || catObj.packages[0];
+            if (pkgObj) packageFee = pkgObj.price;
+          }
+          data.append('admissionFeePaid', admissionFee);
+          data.append('packageFeePaid', packageFee);
+        }
+      }
 
+      const response = await axios.post(endpoint, data);
       const successPayload = userType === 'STAFF' ? response.data.staff : response.data.member;
 
       setSuccessData({
@@ -103,7 +111,6 @@ const MemberRegistration = () => {
           <h2 className="text-2xl font-bold mb-2">Registration Successful!</h2>
           <p className="text-slate-500 mb-8">Member ID Card has been generated below.</p>
 
-          {/* QR Card for Download */}
           <div className="flex justify-center mb-8">
             <div
               ref={cardRef}
@@ -166,18 +173,30 @@ const MemberRegistration = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white p-8 rounded-3xl shadow-xl border border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="md:col-span-2 space-y-2 mb-4">
+
+        {/* Registration Type */}
+        <div className="md:col-span-2 space-y-2 mb-2">
           <label className="text-sm font-bold text-slate-700">Registration Type</label>
-          <select
-            className="w-full p-4 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none font-semibold text-slate-800"
-            value={userType}
-            onChange={(e) => setUserType(e.target.value)}
-          >
-            <option value="MEMBER">Gym Member</option>
-            <option value="STAFF">Gym Staff</option>
-          </select>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { value: 'MEMBER', label: '🆕 New Member', desc: 'Pays admission + package fee' },
+              { value: 'OLD_MEMBER', label: '🕐 Old Member', desc: 'Already paid, set joining date' },
+              { value: 'STAFF', label: '👔 Gym Staff', desc: 'Register staff member' },
+            ].map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setUserType(opt.value)}
+                className={`p-4 rounded-2xl border-2 text-left transition-all ${userType === opt.value ? 'border-indigo-600 bg-indigo-50' : 'border-slate-200 bg-slate-50 hover:border-slate-300'}`}
+              >
+                <p className="font-black text-slate-900 text-sm">{opt.label}</p>
+                <p className="text-xs text-slate-500 mt-1">{opt.desc}</p>
+              </button>
+            ))}
+          </div>
         </div>
 
+        {/* NEW MEMBER — Category + Package + Fees */}
         {userType === 'MEMBER' && settings && (
           <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 bg-indigo-50 p-6 rounded-2xl border border-indigo-100">
             <div className="space-y-2">
@@ -227,11 +246,104 @@ const MemberRegistration = () => {
                     <p className="text-2xl font-black text-indigo-600">₹{total}</p>
                   </div>
                 </div>
-              )
+              );
             })()}
           </div>
         )}
 
+        {/* OLD MEMBER — Category + Package (no fees) + Joining Date */}
+        {userType === 'OLD_MEMBER' && settings && (
+          <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 bg-amber-50 p-6 rounded-2xl border border-amber-200">
+            <div className="md:col-span-2 flex items-center gap-3 p-3 bg-amber-100 rounded-xl border border-amber-200">
+              <Clock size={20} className="text-amber-700 shrink-0" />
+              <p className="text-sm font-bold text-amber-800">Old member — no fees recorded. Expiry = Joining Date + Package Duration.</p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-amber-900">Member Category</label>
+              <select
+                className="w-full p-4 rounded-xl bg-white border border-amber-200 focus:ring-2 focus:ring-amber-500 outline-none"
+                value={formData.memberCategory}
+                onChange={(e) => {
+                  const newCat = e.target.value;
+                  const catObj = settings.pricing.find(c => c.category === newCat);
+                  setFormData({ ...formData, memberCategory: newCat, packageType: catObj?.packages[0]?.name || '' });
+                }}
+              >
+                {settings.pricing.map(cat => (
+                  <option key={cat.category} value={cat.category}>{cat.category}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-amber-900">Package Details</label>
+              <select
+                className="w-full p-4 rounded-xl bg-white border border-amber-200 focus:ring-2 focus:ring-amber-500 outline-none"
+                value={formData.packageType}
+                onChange={(e) => setFormData({ ...formData, packageType: e.target.value })}
+              >
+                {settings.pricing.find(c => c.category === formData.memberCategory)?.packages.map(pkg => (
+                  <option key={pkg.name} value={pkg.name}>{pkg.name} ({pkg.durationDays} days)</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-sm font-bold text-amber-900">Joining Date <span className="text-amber-600">(when they originally joined)</span></label>
+              <input
+                required
+                type="date"
+                className="w-full p-4 rounded-xl bg-white border border-amber-200 focus:ring-2 focus:ring-amber-500 outline-none"
+                value={formData.joiningDate}
+                onChange={(e) => setFormData({ ...formData, joiningDate: e.target.value })}
+              />
+              {formData.joiningDate && (() => {
+                const catObj = settings.pricing.find(c => c.category === formData.memberCategory);
+                const pkgObj = catObj?.packages.find(p => p.name === formData.packageType) || catObj?.packages[0];
+                const days = pkgObj?.durationDays || 30;
+                const joinDate = new Date(formData.joiningDate);
+                const expiry = new Date(joinDate);
+                expiry.setDate(expiry.getDate() + days);
+                const isValid = expiry > new Date();
+                return (
+                  <div className={`mt-2 p-3 rounded-xl text-sm font-bold ${isValid ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                    Expiry Date: {expiry.toLocaleDateString('en-GB')} — {isValid ? '✅ Valid' : '❌ Already Expired'}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+
+        {/* STAFF extra fields */}
+        {userType === 'STAFF' && (
+          <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-200">
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-700">Role / Designation</label>
+              <input
+                required
+                type="text"
+                className="w-full p-4 rounded-xl bg-white border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                placeholder="Trainer, Cleaner, Manager..."
+                value={formData.role}
+                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-700">Joining Date</label>
+              <input
+                required
+                type="date"
+                className="w-full p-4 rounded-xl bg-white border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                value={formData.joiningDate}
+                onChange={(e) => setFormData({ ...formData, joiningDate: e.target.value })}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Common Fields */}
         <div className="space-y-2">
           <label className="text-sm font-bold text-slate-700">Full Name</label>
           <input
@@ -278,33 +390,6 @@ const MemberRegistration = () => {
           />
         </div>
 
-        {userType === 'STAFF' && (
-          <>
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700">Role / Designation</label>
-              <input
-                required={userType === 'STAFF'}
-                type="text"
-                className="w-full p-4 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                placeholder="Trainer, Cleaner, Manager..."
-                value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700">Joining Date</label>
-              <input
-                required={userType === 'STAFF'}
-                type="date"
-                className="w-full p-4 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-                value={formData.joiningDate}
-                onChange={(e) => setFormData({ ...formData, joiningDate: e.target.value })}
-              />
-            </div>
-          </>
-        )}
-
         <div className="md:col-span-2 space-y-2">
           <label className="text-sm font-bold text-slate-700">Member Photo</label>
           <div className="relative group cursor-pointer">
@@ -323,9 +408,13 @@ const MemberRegistration = () => {
         <div className="md:col-span-2 pt-4">
           <button
             disabled={loading}
-            className="w-full p-5 bg-indigo-600 text-white rounded-2xl font-black text-xl shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all disabled:opacity-50"
+            className={`w-full p-5 text-white rounded-2xl font-black text-xl shadow-lg transition-all disabled:opacity-50 ${
+              userType === 'OLD_MEMBER'
+                ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-100'
+                : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'
+            }`}
           >
-            {loading ? 'Registering...' : 'REGISTER MEMBER'}
+            {loading ? 'Registering...' : userType === 'OLD_MEMBER' ? 'REGISTER OLD MEMBER' : userType === 'STAFF' ? 'REGISTER STAFF' : 'REGISTER MEMBER'}
           </button>
         </div>
       </form>

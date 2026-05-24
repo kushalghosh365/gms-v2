@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
-import { Search, Phone, Briefcase, CheckCircle, XCircle, LogIn, LogOut, Clock, CalendarX2, Monitor, X, Download, Lock, User } from 'lucide-react';
+import { Search, Phone, Briefcase, CheckCircle, XCircle, LogIn, LogOut, Clock, CalendarX2, Monitor, X, Download, Lock, User, Trash2, Send } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import html2canvas from 'html2canvas';
 
@@ -15,6 +15,14 @@ const StaffList = () => {
   const [qrModal, setQrModal] = useState({ show: false, member: null });
   const [detailsModal, setDetailsModal] = useState({ show: false, staff: null });
   const cardRef = useRef(null);
+
+  // Delete modal state
+  const [deleteModal, setDeleteModal] = useState({ show: false, staff: null });
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Send QR state
+  const [sendQrStatus, setSendQrStatus] = useState({});
 
   useEffect(() => {
     fetchStaff();
@@ -47,6 +55,34 @@ const StaffList = () => {
       fetchStaff();
     } catch (err) {
       alert('Error: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
+  const handleDeleteStaff = async () => {
+    if (!deletePassword.trim()) { alert('Please enter admin password'); return; }
+    setDeleteLoading(true);
+    try {
+      await axios.delete(`/api/staff/${deleteModal.staff._id}`, { data: { password: deletePassword } });
+      setDeleteModal({ show: false, staff: null });
+      setDeletePassword('');
+      fetchStaff();
+    } catch (err) {
+      alert('Error: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleSendQR = async (s) => {
+    setSendQrStatus(prev => ({ ...prev, [s._id]: 'sending' }));
+    try {
+      await axios.post('/api/admin/whatsapp/send-qr', { phone: s.phone, name: s.fullName, whatsapp: s.whatsapp });
+      setSendQrStatus(prev => ({ ...prev, [s._id]: 'sent' }));
+      setTimeout(() => setSendQrStatus(prev => { const { [s._id]: _, ...rest } = prev; return rest; }), 3000);
+    } catch (err) {
+      setSendQrStatus(prev => ({ ...prev, [s._id]: 'error' }));
+      setTimeout(() => setSendQrStatus(prev => { const { [s._id]: _, ...rest } = prev; return rest; }), 3000);
+      alert(err.response?.data?.error || 'Failed to send QR');
     }
   };
 
@@ -271,6 +307,15 @@ const StaffList = () => {
                     </div>
                   )}
 
+                  {/* Delete Button */}
+                  <button
+                    onClick={() => { setDeleteModal({ show: true, staff: s }); setDeletePassword(''); }}
+                    className="absolute top-3 left-3 p-1.5 bg-red-50 text-red-400 rounded-lg hover:bg-red-100 hover:text-red-600 transition opacity-0 group-hover:opacity-100 z-10"
+                    title="Delete Staff"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-start space-x-4">
                       <img
@@ -360,12 +405,63 @@ const StaffList = () => {
                       <Monitor size={14} />
                       <span className="text-[8px] font-bold mt-1">QR</span>
                     </button>
+                    <button
+                      onClick={() => handleSendQR(s)}
+                      disabled={sendQrStatus[s._id] === 'sending'}
+                      className={`p-1.5 rounded-xl active:scale-95 flex flex-col items-center justify-center transition-all shadow-sm ${
+                        sendQrStatus[s._id] === 'sent' ? 'bg-green-100 text-green-600' :
+                        sendQrStatus[s._id] === 'error' ? 'bg-red-100 text-red-600' :
+                        'bg-teal-50 text-teal-600 hover:bg-teal-100'
+                      }`}
+                      title="Send QR to WhatsApp"
+                    >
+                      <Send size={14} />
+                      <span className="text-[8px] font-bold mt-1">
+                        {sendQrStatus[s._id] === 'sending' ? '...' : sendQrStatus[s._id] === 'sent' ? '✓' : sendQrStatus[s._id] === 'error' ? '✗' : 'WA'}
+                      </span>
+                    </button>
                   </div>
                 </div>
               )
             })}
           </div>
         </>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteModal.show && deleteModal.staff && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-in zoom-in duration-300">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-red-100 rounded-2xl"><Trash2 size={24} className="text-red-600" /></div>
+              <div>
+                <h2 className="text-xl font-black text-slate-900">Delete Staff</h2>
+                <p className="text-sm text-slate-500">Registration only — history preserved</p>
+              </div>
+            </div>
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-6">
+              <p className="text-sm font-bold text-red-800">⚠️ <span className="font-black">{deleteModal.staff.fullName}</span> will be removed.</p>
+              <p className="text-xs text-red-600 mt-1">Attendance records will be preserved.</p>
+            </div>
+            <div className="space-y-2 mb-6">
+              <label className="text-sm font-bold text-slate-700">Enter Admin Password</label>
+              <input
+                type="password"
+                placeholder="Admin Password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                className="w-full p-4 rounded-xl border-2 border-slate-200 focus:border-red-400 outline-none font-bold"
+                onKeyDown={(e) => e.key === 'Enter' && handleDeleteStaff()}
+              />
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => { setDeleteModal({ show: false, staff: null }); setDeletePassword(''); }} className="flex-1 p-3 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition">Cancel</button>
+              <button onClick={handleDeleteStaff} disabled={deleteLoading} className="flex-1 p-3 bg-red-600 text-white rounded-2xl font-bold hover:bg-red-700 transition disabled:opacity-50">
+                {deleteLoading ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* QR Card Modal */}

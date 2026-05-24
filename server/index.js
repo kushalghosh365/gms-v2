@@ -565,7 +565,7 @@ app.post('/api/members/register', upload.single('photo'), async (req, res) => {
 // 2. Get All Members
 app.get('/api/members', async (req, res) => {
     try {
-        const members = await Member.findAll();
+        const members = await Member.findAll({ where: { isDeleted: false } });
         res.json(mapRecords(members));
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -597,7 +597,7 @@ app.post('/api/staff/register', upload.single('photo'), async (req, res) => {
 // Staff: Get All
 app.get('/api/staff', async (req, res) => {
     try {
-        const staff = await Staff.findAll();
+        const staff = await Staff.findAll({ where: { isDeleted: false } });
         res.json(mapRecords(staff));
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -686,7 +686,7 @@ app.post('/api/admin/staff-attendance', async (req, res) => {
 // 3. Kiosk: Get Profile by Phone
 app.get('/api/kiosk/profile/:phone', async (req, res) => {
     try {
-        let member = await Member.findOne({ where: { phone: req.params.phone } });
+        let member = await Member.findOne({ where: { phone: req.params.phone, isDeleted: false } });
         if (member) {
             let memberObj = mapRecord(member);
             const responseData = { ...memberObj, userType: 'MEMBER' };
@@ -696,7 +696,7 @@ app.get('/api/kiosk/profile/:phone', async (req, res) => {
             return res.json(responseData);
         }
         
-        let staff = await Staff.findOne({ where: { phone: req.params.phone } });
+        let staff = await Staff.findOne({ where: { phone: req.params.phone, isDeleted: false } });
         if (staff) return res.json({ ...mapRecord(staff), userType: 'STAFF' });
         
         res.status(404).json({ message: 'User not found' });
@@ -1115,5 +1115,145 @@ app.post('/api/admin/clear-staff-attendance', async (req, res) => {
     }
 });
 
+// =============================================
+// OLD MEMBER REGISTRATION (No fees recorded)
+// =============================================
+app.post('/api/members/register-old', upload.single('photo'), async (req, res) => {
+    try {
+        const { fullName, email, phone, whatsapp, memberCategory, packageType, joiningDate } = req.body;
+        let photoPath = '';
+        if (req.file) {
+            const result = await uploadToCloudinary(req.file.buffer, 'gms-members');
+            photoPath = result.secure_url;
+        }
+
+        const existingMember = await Member.findOne({ where: { phone } });
+        if (existingMember) {
+            return res.status(400).json({ error: 'Member with this phone number already exists' });
+        }
+
+        // Calculate expiry from joining date + package duration
+        let durationDays = 30;
+        let settings = await Settings.findOne();
+        if (settings) {
+            const categoryConfig = settings.pricing.find(c => c.category === (memberCategory || 'General'));
+            if (categoryConfig) {
+                const pack = categoryConfig.packages.find(p => p.name === (packageType || '1 Month'));
+                if (pack) durationDays = pack.durationDays;
+            }
+        }
+
+        const joinDate = joiningDate ? new Date(joiningDate) : new Date();
+        let expiryDate = new Date(joinDate);
+        expiryDate.setDate(expiryDate.getDate() + durationDays);
+
+        const membershipStatus = expiryDate > new Date() ? 'Valid' : 'Expired';
+
+        const newMember = await Member.create({
+            fullName, email, phone, whatsapp, photo: photoPath,
+            memberCategory: memberCategory || 'General',
+            packageType: packageType || '1 Month',
+            membershipStatus,
+            expiryDate,
+            registrationDate: joinDate
+        });
+
+        const qrCodeData = await QRCode.toDataURL(phone);
+        res.status(201).json({
+            message: 'Old Member Registration successful',
+            member: mapRecord(newMember),
+            qrCode: qrCodeData
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// =============================================
+// SOFT DELETE: Member (keeps fees & history)
+// =============================================
+app.delete('/api/members/:id', async (req, res) => {
+    try {
+        const { password } = req.body;
+        const admin = await Admin.findOne();
+        if (!admin) return res.status(404).json({ message: 'Admin not found' });
+        if (admin.password !== password) {
+            return res.status(401).json({ message: 'Incorrect password' });
+        }
+        const member = await Member.findByPk(req.params.id);
+        if (!member) return res.status(404).json({ message: 'Member not found' });
+        member.isDeleted = true;
+        await member.save();
+        res.json({ message: 'Member deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// =============================================
+// SOFT DELETE: Staff (keeps history)
+// =============================================
+app.delete('/api/staff/:id', async (req, res) => {
+    try {
+        const { password } = req.body;
+        const admin = await Admin.findOne();
+        if (!admin) return res.status(404).json({ message: 'Admin not found' });
+        if (admin.password !== password) {
+            return res.status(401).json({ message: 'Incorrect password' });
+        }
+        const staff = await Staff.findByPk(req.params.id);
+        if (!staff) return res.status(404).json({ message: 'Staff not found' });
+        staff.isDeleted = true;
+        await staff.save();
+        res.json({ message: 'Staff deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// =============================================
+// WHATSAPP: Send QR Code to member/staff
+// =============================================
+app.post('/api/admin/whatsapp/send-qr', async (req, res) => {
+    if (waStatus !== 'CONNECTED') {
+        return res.status(400).json({ error: 'WhatsApp is not connected' });
+    }
+    try {
+        const { phone, name, whatsapp } = req.body;
+        let phoneStr = whatsapp || phone;
+        if (!phoneStr) return res.status(400).json({ error: 'No WhatsApp number available' });
+
+        let cleanPhone = phoneStr.replace(/\D/g, '');
+        if (cleanPhone.length === 10) cleanPhone = `91${cleanPhone}`;
+        const chatId = `${cleanPhone}@c.us`;
+
+        const isRegistered = await waClient.isRegisteredUser(chatId);
+        if (!isRegistered) {
+            return res.status(400).json({ error: 'Number not registered on WhatsApp' });
+        }
+
+        // Generate QR code as base64 image
+        const qrBuffer = await QRCode.toBuffer(phone, { type: 'png', width: 400, margin: 2 });
+        const { MessageMedia } = require('whatsapp-web.js');
+        const media = new MessageMedia('image/png', qrBuffer.toString('base64'), `${name}_QR.png`);
+        
+        await waClient.sendMessage(chatId, media, { caption: `🏋️ *${name}* - Gym QR Code\nScan this code at the kiosk for attendance.` });
+
+        res.json({ message: `QR Code sent to ${name}'s WhatsApp!` });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+// Use alter:true so new columns (isDeleted) are auto-added on Render restart
+const { Op } = require('sequelize');
+sequelize.sync({ alter: true }).then(() => {
+    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+}).catch(err => {
+    console.error('DB sync failed:', err);
+    // Start anyway so Render doesn't crash
+    app.listen(PORT, () => console.log(`Server running on port ${PORT} (sync failed)`));
+});
+

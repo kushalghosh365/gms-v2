@@ -43,15 +43,12 @@ const OwnerDashboard = () => {
     }
   };
 
-  // Check WA status every few seconds if modal is open and not connected
+  // Check WA status on mount and periodically
   useEffect(() => {
-    let interval;
-    if (showExpiryModal && waStatus !== 'CONNECTED') {
-      checkWaStatus();
-      interval = setInterval(checkWaStatus, 3000);
-    }
+    checkWaStatus();
+    const interval = setInterval(checkWaStatus, 5000);
     return () => clearInterval(interval);
-  }, [showExpiryModal, waStatus]);
+  }, []);
 
   const handleSendReminders = async () => {
     if (waStatus !== 'CONNECTED') {
@@ -182,55 +179,30 @@ const OwnerDashboard = () => {
               </button>
             </div>
             
-            {/* WhatsApp Integration Panel */}
-            <div className="bg-slate-50 border-b border-slate-200 p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+            {/* Send Reminders Button Only */}
+            <div className="bg-slate-50 border-b border-slate-200 p-4 flex items-center justify-between gap-4">
               <div className="flex items-center space-x-3">
-                <div className={`p-3 rounded-xl text-white shadow-md ${waStatus === 'CONNECTED' ? 'bg-green-500' : 'bg-slate-700'}`}>
-                  {waStatus === 'CONNECTED' ? <MessageCircle size={24} /> : <QrCode size={24} />}
-                </div>
-                <div>
-                  <h3 className="font-black text-slate-800">WhatsApp Automation</h3>
-                  <p className="text-xs text-slate-500 font-bold">
-                    Status: <span className={waStatus === 'CONNECTED' ? 'text-green-600' : 'text-orange-600'}>{waStatus}</span>
-                  </p>
-                </div>
-              </div>
-              
-              {waStatus === 'QR_READY' && waQR && (
-                <div className="flex items-center space-x-4 bg-white p-2 rounded-xl shadow-sm border border-slate-200">
-                  <img src={waQR} alt="WhatsApp QR" className="w-20 h-20" />
-                  <p className="text-xs font-bold text-slate-600 max-w-[150px]">Scan this QR with your Gym's WhatsApp to link.</p>
-                </div>
-              )}
-
-              <div className="flex flex-col items-end gap-2">
-                <button 
-                  onClick={handleSendReminders}
-                  disabled={waStatus !== 'CONNECTED' || isSendingWa || expiringMembers.length === 0}
-                  className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-black transition-all shadow-md ${
-                    waStatus === 'CONNECTED' && !isSendingWa && expiringMembers.length > 0
-                    ? 'bg-green-500 hover:bg-green-600 text-white hover:shadow-lg transform hover:-translate-y-1' 
-                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                  }`}
-                >
+                <div className={`p-2 rounded-xl text-white ${waStatus === 'CONNECTED' ? 'bg-green-500' : 'bg-slate-400'}`}>
                   <MessageCircle size={18} />
-                  <span>{isSendingWa ? 'Sending...' : 'All members to send msg'}</span>
-                </button>
-
-                {/* WhatsApp Disconnect / Logout Button */}
-                {waStatus === 'CONNECTED' && (
-                  <button
-                    onClick={handleWaLogout}
-                    disabled={isLoggingOutWa}
-                    className="flex items-center space-x-2 px-6 py-3 rounded-xl font-black transition-all shadow-md bg-red-500 hover:bg-red-600 text-white hover:shadow-lg transform hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <LogOut size={18} />
-                    <span>{isLoggingOutWa ? 'Disconnecting...' : 'Disconnect WhatsApp'}</span>
-                  </button>
-                )}
-
-                {waMessage && <p className="text-xs font-bold text-green-600 mt-2">{waMessage}</p>}
+                </div>
+                <p className="text-sm font-bold text-slate-600">
+                  WhatsApp: <span className={waStatus === 'CONNECTED' ? 'text-green-600' : 'text-orange-500'}>{waStatus}</span>
+                  {waStatus !== 'CONNECTED' && <span className="text-xs text-slate-400 ml-2">(Connect from Dashboard → WhatsApp Login section)</span>}
+                </p>
               </div>
+              <button
+                onClick={handleSendReminders}
+                disabled={waStatus !== 'CONNECTED' || isSendingWa || expiringMembers.length === 0}
+                className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-black transition-all shadow-md ${
+                  waStatus === 'CONNECTED' && !isSendingWa && expiringMembers.length > 0
+                  ? 'bg-green-500 hover:bg-green-600 text-white' 
+                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                }`}
+              >
+                <MessageCircle size={18} />
+                <span>{isSendingWa ? 'Sending...' : 'Send msg to all expiring'}</span>
+              </button>
+              {waMessage && <p className="text-xs font-bold text-green-600">{waMessage}</p>}
             </div>
 
             <div className="overflow-y-auto p-6 space-y-4 flex-1">
@@ -265,6 +237,76 @@ const OwnerDashboard = () => {
           </div>
         </div>
       )}
+
+      {/* ============================================= */}
+      {/* WHATSAPP LOGIN — Separate Section */}
+      {/* ============================================= */}
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-green-50 to-emerald-50 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={`p-3 rounded-2xl text-white shadow-md ${waStatus === 'CONNECTED' ? 'bg-green-500' : 'bg-slate-600'}`}>
+              {waStatus === 'CONNECTED' ? <MessageCircle size={24} /> : <QrCode size={24} />}
+            </div>
+            <div>
+              <h2 className="text-xl font-black text-slate-900">WhatsApp Login</h2>
+              <p className="text-sm font-bold">
+                Status: <span className={waStatus === 'CONNECTED' ? 'text-green-600' : waStatus === 'QR_READY' ? 'text-amber-600' : 'text-slate-500'}>{waStatus}</span>
+              </p>
+            </div>
+          </div>
+          {waStatus === 'CONNECTED' && (
+            <button
+              onClick={handleWaLogout}
+              disabled={isLoggingOutWa}
+              className="flex items-center gap-2 px-5 py-3 bg-red-500 hover:bg-red-600 text-white rounded-2xl font-bold transition disabled:opacity-50"
+            >
+              <LogOut size={16} />
+              {isLoggingOutWa ? 'Disconnecting...' : 'Disconnect'}
+            </button>
+          )}
+        </div>
+
+        <div className="p-6">
+          {waStatus === 'CONNECTED' && (
+            <div className="flex items-center gap-4 p-4 bg-green-50 rounded-2xl border border-green-200">
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                <MessageCircle size={24} className="text-green-600" />
+              </div>
+              <div>
+                <p className="font-black text-green-800">WhatsApp Connected ✅</p>
+                <p className="text-sm text-green-600">You can now send QR codes to members & staff from their cards.</p>
+              </div>
+            </div>
+          )}
+
+          {waStatus === 'QR_READY' && waQR && (
+            <div className="flex flex-col md:flex-row items-center gap-6">
+              <div className="p-4 bg-white rounded-2xl shadow-lg border border-slate-200">
+                <img src={waQR} alt="WhatsApp QR" className="w-48 h-48" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900 mb-2">Scan to Connect</h3>
+                <p className="text-slate-600 text-sm">Open WhatsApp on your phone → Linked Devices → Link a device → Scan this QR.</p>
+                <p className="text-xs text-slate-400 mt-3">QR refreshes automatically every few seconds.</p>
+              </div>
+            </div>
+          )}
+
+          {waStatus === 'DISCONNECTED' && (
+            <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+              <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center">
+                <QrCode size={24} className="text-slate-500" />
+              </div>
+              <div>
+                <p className="font-black text-slate-700">WhatsApp Not Connected</p>
+                <p className="text-sm text-slate-500">Waiting for QR code to generate... Please wait a moment.</p>
+              </div>
+            </div>
+          )}
+
+          {waMessage && <p className="mt-4 text-sm font-bold text-green-600 bg-green-50 p-3 rounded-xl">{waMessage}</p>}
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* Live Attendance Table */}

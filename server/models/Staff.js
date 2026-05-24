@@ -11,7 +11,8 @@ const Staff = sequelize.define('Staff', {
     role: { type: DataTypes.STRING, allowNull: false },
     joiningDate: { type: DataTypes.STRING },
     attendance: { type: DataTypes.JSON, defaultValue: [] },
-    registrationDate: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+    registrationDate: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
+    isDeleted: { type: DataTypes.BOOLEAN, defaultValue: false }
 }, {
     tableName: 'staffs',
     timestamps: true

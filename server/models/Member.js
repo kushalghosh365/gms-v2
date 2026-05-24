@@ -15,7 +15,8 @@ const Member = sequelize.define('Member', {
     packageType: { type: DataTypes.STRING },
     attendance: { type: DataTypes.JSON, defaultValue: [] },
     paymentNotification: { type: DataTypes.STRING, defaultValue: null },
-    registrationDate: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+    registrationDate: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
+    isDeleted: { type: DataTypes.BOOLEAN, defaultValue: false }
 }, {
     tableName: 'members',
     timestamps: true
