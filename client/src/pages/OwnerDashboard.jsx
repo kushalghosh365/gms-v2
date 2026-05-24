@@ -240,7 +240,7 @@ const OwnerDashboard = () => {
                   <div key={m._id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
                     <div className="flex items-center space-x-4">
                       <img 
-                        src={m.photo ? (m.photo.startsWith("http") ? m.photo : `/${m.photo}`) : 'https://via.placeholder.com/50'} 
+                        src={m.photo ? m.photo : 'https://via.placeholder.com/50'} 
                         className="w-14 h-14 rounded-xl object-cover border-2 border-white shadow-sm"
                         alt=""
                       />
@@ -291,7 +291,7 @@ const OwnerDashboard = () => {
                   <tr key={m._id} className="hover:bg-slate-50 transition">
                     <td className="px-6 py-4 flex items-center space-x-3">
                       <img 
-                        src={m.photo ? (m.photo.startsWith("http") ? m.photo : `/${m.photo}`) : 'https://via.placeholder.com/40'} 
+                        src={m.photo ? m.photo : 'https://via.placeholder.com/40'} 
                         className="w-10 h-10 rounded-full object-cover border-2 border-slate-200"
                         alt=""
                       />

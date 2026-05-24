@@ -215,7 +215,7 @@ const StaffList = () => {
                     {todayAttendance.map(({ staff: s, record }, idx) => (
                       <tr key={idx} className="border-b border-slate-50 hover:bg-slate-50 transition">
                         <td className="py-4 px-4 font-bold text-slate-900 flex items-center space-x-3">
-                          <img src={s.photo ? (s.photo.startsWith("http") ? s.photo : `/${s.photo.replace(/\\/g, "/")}`) : 'https://via.placeholder.com/40'} className="w-8 h-8 rounded-full object-cover" crossOrigin={s.photo ? "anonymous" : undefined} />
+                          <img src={s.photo ? (s.photo.startsWith("http") ? s.photo : s.photo) : 'https://via.placeholder.com/40'} className="w-8 h-8 rounded-full object-cover" crossOrigin={s.photo ? "anonymous" : undefined} />
                           <span>{s.fullName}</span>
                         </td>
                         <td className="py-4 px-4 text-indigo-600 font-bold text-xs uppercase tracking-wider">{s.role}</td>
@@ -274,7 +274,7 @@ const StaffList = () => {
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-start space-x-4">
                       <img
-                        src={s.photo ? (s.photo.startsWith("http") ? s.photo : `/${s.photo.replace(/\\/g, "/")}`) : 'https://via.placeholder.com/60'}
+                        src={s.photo ? (s.photo.startsWith("http") ? s.photo : s.photo) : 'https://via.placeholder.com/60'}
                         crossOrigin={s.photo ? "anonymous" : undefined}
                         className="w-16 h-16 rounded-2xl object-cover border-2 border-slate-100 group-hover:scale-105 transition-transform"
                         alt={s.fullName}
@@ -396,7 +396,7 @@ const StaffList = () => {
                   style={{ border: '4px solid #e0e7ff' }}
                 >
                   <img
-                    src={qrModal.member.photo ? (qrModal.member.photo.startsWith("http") ? qrModal.member.photo : `/${qrModal.member.photo.replace(/\\/g, "/")}`) : 'https://via.placeholder.com/150'}
+                    src={qrModal.member.photo ? (qrModal.member.photo.startsWith("http") ? qrModal.member.photo : qrModal.member.photo) : 'https://via.placeholder.com/150'}
                     crossOrigin={qrModal.member.photo ? "anonymous" : undefined}
                     alt="Staff"
                     className="w-full h-full object-cover"
@@ -440,7 +440,7 @@ const StaffList = () => {
             <div className="p-8 space-y-4">
               <div className="flex items-center gap-6 mb-6 pb-6 border-b border-slate-100">
                 <img
-                  src={detailsModal.staff.photo ? (detailsModal.staff.photo.startsWith("http") ? detailsModal.staff.photo : `/${detailsModal.staff.photo.replace(/\\/g, "/")}`) : 'https://via.placeholder.com/100'}
+                  src={detailsModal.staff.photo ? (detailsModal.staff.photo.startsWith("http") ? detailsModal.staff.photo : detailsModal.staff.photo) : 'https://via.placeholder.com/100'}
                   crossOrigin={detailsModal.staff.photo ? "anonymous" : undefined}
                   className="w-24 h-24 rounded-2xl object-cover border-4 border-slate-50 shadow-sm"
                   alt="Profile"

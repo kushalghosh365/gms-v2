@@ -100,7 +100,7 @@ const PaymentHistory = () => {
                                 </td>
                                 <td className="px-6 py-4 flex items-center space-x-3">
                                     <img 
-                                        src={p.memberId?.photo ? (p.memberId.photo.startsWith("http") ? p.memberId.photo : `/${p.memberId.photo}`) : 'https://via.placeholder.com/40'} 
+                                        src={p.memberId?.photo ? p.memberId.photo : 'https://via.placeholder.com/40'} 
                                         className="w-8 h-8 rounded-full object-cover border border-slate-200"
                                         alt=""
                                     />
@@ -236,7 +236,7 @@ const StaffAttendanceHistory = () => {
                                 <td className="px-6 py-4 text-sm font-bold text-slate-600">{new Date(record.date).toLocaleDateString('en-GB')}</td>
                                 <td className="px-6 py-4 flex items-center space-x-3">
                                     <img 
-                                        src={record.photo ? (record.photo.startsWith("http") ? record.photo : `/${record.photo}`) : 'https://via.placeholder.com/40'} 
+                                        src={record.photo ? record.photo : 'https://via.placeholder.com/40'} 
                                         className="w-8 h-8 rounded-full object-cover border border-slate-200"
                                         alt=""
                                     />

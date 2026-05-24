@@ -285,7 +285,7 @@ const MemberKiosk = () => {
             <div className="relative mb-8">
               <div className="w-44 h-44 rounded-[50px] border-[8px] border-slate-50 overflow-hidden shadow-2xl">
                 <img 
-                  src={member.photo ? (member.photo.startsWith("http") ? member.photo : `/${member.photo}`) : 'https://via.placeholder.com/150'} 
+                  src={member.photo ? member.photo : 'https://via.placeholder.com/150'} 
                   alt="Member" 
                   className="w-full h-full object-cover"
                 />

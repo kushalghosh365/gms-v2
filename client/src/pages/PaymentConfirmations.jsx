@@ -77,7 +77,7 @@ const PaymentConfirmations = () => {
                 <div className="flex items-center space-x-4 mb-6 mt-2">
                     <div className="w-16 h-16 rounded-[20px] bg-slate-100 overflow-hidden shrink-0">
                         <img 
-                          src={req.memberId?.photo ? (req.memberId.photo.startsWith("http") ? req.memberId.photo : `/${req.memberId.photo}`) : 'https://via.placeholder.com/150'} 
+                          src={req.memberId?.photo ? req.memberId.photo : 'https://via.placeholder.com/150'} 
                           alt="Member" 
                           className="w-full h-full object-cover"
                         />

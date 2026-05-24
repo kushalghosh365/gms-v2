@@ -93,7 +93,7 @@ const MemberRegistration = () => {
 
   if (successData) {
     const photoUrl = successData.member.photo
-      ? (successData.member.photo.startsWith('http') ? successData.member.photo : (successData.member.photo.startsWith("http") ? successData.member.photo : `/${successData.member.photo.replace(/\\/g, "/")}`))
+      ? (successData.member.photo.startsWith('http') ? successData.member.photo : successData.member.photo)
       : 'https://via.placeholder.com/150';
 
     return (
