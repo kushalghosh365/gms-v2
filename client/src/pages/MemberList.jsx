@@ -177,7 +177,7 @@ const MemberList = () => {
 
             <div className="flex items-start space-x-4 mb-6">
               <img
-                src={m.photo ? `/${m.photo.replace(/\\/g, '/')}` : 'https://via.placeholder.com/60'}
+                src={m.photo ? (m.photo.startsWith('http') ? m.photo : `/${m.photo.replace(/\\/g, '/')}`) : 'https://via.placeholder.com/60'}
                 crossOrigin={m.photo ? "anonymous" : undefined}
                 className="w-16 h-16 rounded-2xl object-cover border-2 border-slate-100 group-hover:scale-105 transition-transform"
                 alt={m.fullName}
@@ -279,7 +279,7 @@ const MemberList = () => {
                   style={{ border: '4px solid #e0e7ff' }}
                 >
                   <img
-                    src={qrModal.member.photo ? `/${qrModal.member.photo.replace(/\\/g, '/')}` : 'https://via.placeholder.com/150'}
+                    src={qrModal.member.photo ? (qrModal.member.photo.startsWith('http') ? qrModal.member.photo : `/${qrModal.member.photo.replace(/\\/g, '/')}`) : 'https://via.placeholder.com/150'}
                     crossOrigin={qrModal.member.photo ? "anonymous" : undefined}
                     alt="Member"
                     className="w-full h-full object-cover"
@@ -371,7 +371,7 @@ const MemberList = () => {
             <div className="p-8 space-y-4">
               <div className="flex items-center gap-6 mb-6 pb-6 border-b border-slate-100">
                 <img
-                  src={detailsModal.member.photo ? `/${detailsModal.member.photo.replace(/\\/g, '/')}` : 'https://via.placeholder.com/100'}
+                  src={detailsModal.member.photo ? (detailsModal.member.photo.startsWith('http') ? detailsModal.member.photo : `/${detailsModal.member.photo.replace(/\\/g, '/')}`) : 'https://via.placeholder.com/100'}
                   crossOrigin={detailsModal.member.photo ? "anonymous" : undefined}
                   className="w-24 h-24 rounded-2xl object-cover border-4 border-slate-50 shadow-sm"
                   alt="Profile"
