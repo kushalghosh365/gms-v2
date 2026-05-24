@@ -16,7 +16,8 @@ const Member = sequelize.define('Member', {
     attendance: { type: DataTypes.JSON, defaultValue: [] },
     paymentNotification: { type: DataTypes.STRING, defaultValue: null },
     registrationDate: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
-    isDeleted: { type: DataTypes.BOOLEAN, defaultValue: false }
+    isDeleted: { type: DataTypes.BOOLEAN, defaultValue: false },
+    gender: { type: DataTypes.STRING, defaultValue: 'Male' }
 }, {
     tableName: 'members',
     timestamps: true

@@ -555,6 +555,10 @@ const StaffList = () => {
                   <p className="font-bold text-slate-800">{detailsModal.staff.phone}</p>
                 </div>
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Gender</p>
+                  <p className="font-bold text-slate-800">{detailsModal.staff.gender || 'Male'}</p>
+                </div>
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">WhatsApp</p>
                   <p className="font-bold text-slate-800">{detailsModal.staff.whatsapp || 'N/A'}</p>
                 </div>

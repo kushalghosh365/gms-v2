@@ -379,6 +379,7 @@ const MemberList = () => {
               <div className="grid grid-cols-2 gap-4">
                 {[
                   { label: 'Phone Number', value: detailsModal.member.phone },
+                  { label: 'Gender', value: detailsModal.member.gender || 'Male' },
                   { label: 'WhatsApp', value: detailsModal.member.whatsapp || 'N/A' },
                   { label: 'Email Address', value: detailsModal.member.email || 'N/A' },
                   { label: 'Category', value: detailsModal.member.memberCategory || 'General' },

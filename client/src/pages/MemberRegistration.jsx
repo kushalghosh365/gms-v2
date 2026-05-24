@@ -13,7 +13,8 @@ const MemberRegistration = () => {
     role: '',
     joiningDate: '',
     memberCategory: 'General',
-    packageType: '1 Month'
+    packageType: '1 Month',
+    gender: 'Male'
   });
   const [settings, setSettings] = useState(null);
 
@@ -67,7 +68,7 @@ const MemberRegistration = () => {
         qrCode: response.data.qrCode,
         isStaff: userType === 'STAFF'
       });
-      setFormData({ fullName: '', email: '', phone: '', whatsapp: '', role: '', joiningDate: '', memberCategory: 'General', packageType: '1 Month' });
+      setFormData({ fullName: '', email: '', phone: '', whatsapp: '', role: '', joiningDate: '', memberCategory: 'General', packageType: '1 Month', gender: 'Male' });
       setPhoto(null);
     } catch (err) {
       alert('Registration failed: ' + (err.response?.data?.error || err.message));
@@ -354,6 +355,19 @@ const MemberRegistration = () => {
             value={formData.fullName}
             onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
           />
+        </div>
+
+        {/* Gender selection */}
+        <div className="space-y-2">
+          <label className="text-sm font-bold text-slate-700">Gender</label>
+          <select
+            className="w-full p-4 rounded-xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-800"
+            value={formData.gender}
+            onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+          >
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
         </div>
 
         <div className="space-y-2">

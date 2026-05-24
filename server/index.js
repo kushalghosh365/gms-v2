@@ -496,7 +496,7 @@ app.post('/api/admin/whatsapp/send-reminders', async (req, res) => {
 // 1. Register Member
 app.post('/api/members/register', upload.single('photo'), async (req, res) => {
     try {
-        const { fullName, email, phone, whatsapp, memberCategory, packageType, admissionFeePaid, packageFeePaid } = req.body;
+        const { fullName, email, phone, whatsapp, memberCategory, packageType, admissionFeePaid, packageFeePaid, gender } = req.body;
         let photoPath = '';
         if (req.file) {
             const result = await uploadToCloudinary(req.file.buffer, 'gms-members');
@@ -526,7 +526,8 @@ app.post('/api/members/register', upload.single('photo'), async (req, res) => {
             memberCategory: memberCategory || 'General',
             packageType: packageType || '1 Month',
             membershipStatus: 'Valid',
-            expiryDate
+            expiryDate,
+            gender: gender || 'Male'
         });
 
         const admissionAmt = Number(admissionFeePaid || 0);
@@ -579,7 +580,7 @@ app.get('/api/members', async (req, res) => {
 // Staff: Register
 app.post('/api/staff/register', upload.single('photo'), async (req, res) => {
     try {
-        const { fullName, email, phone, whatsapp, role, joiningDate } = req.body;
+        const { fullName, email, phone, whatsapp, role, joiningDate, gender } = req.body;
         let photo = '';
         if (req.file) {
             const result = await uploadToCloudinary(req.file.buffer, 'gms-staff');
@@ -589,7 +590,7 @@ app.post('/api/staff/register', upload.single('photo'), async (req, res) => {
         const existingStaff = await Staff.findOne({ where: { phone } });
         if (existingStaff) return res.status(400).json({ error: 'Staff with this phone number already exists' });
 
-        const newStaff = await Staff.create({ fullName, email, phone, whatsapp, photo, role, joiningDate });
+        const newStaff = await Staff.create({ fullName, email, phone, whatsapp, photo, role, joiningDate, gender: gender || 'Male' });
         const qrCodeData = await QRCode.toDataURL(phone);
 
         res.status(201).json({ message: 'Staff Registration successful', staff: mapRecord(newStaff), qrCode: qrCodeData });
@@ -1124,7 +1125,7 @@ app.post('/api/admin/clear-staff-attendance', async (req, res) => {
 // =============================================
 app.post('/api/members/register-old', upload.single('photo'), async (req, res) => {
     try {
-        const { fullName, email, phone, whatsapp, memberCategory, packageType, joiningDate } = req.body;
+        const { fullName, email, phone, whatsapp, memberCategory, packageType, joiningDate, gender } = req.body;
         let photoPath = '';
         if (req.file) {
             const result = await uploadToCloudinary(req.file.buffer, 'gms-members');
@@ -1159,7 +1160,8 @@ app.post('/api/members/register-old', upload.single('photo'), async (req, res) =
             packageType: packageType || '1 Month',
             membershipStatus,
             expiryDate,
-            registrationDate: joinDate
+            registrationDate: joinDate,
+            gender: gender || 'Male'
         });
 
         const qrCodeData = await QRCode.toDataURL(phone);
