@@ -472,7 +472,9 @@ app.post('/api/admin/whatsapp/send-reminders', async (req, res) => {
             }
 
             const expDate = new Date(m.expiryDate);
-            const dateStr = `${expDate.getMonth() + 1}/${expDate.getDate()}/${expDate.getFullYear()}`;
+            const day = String(expDate.getDate()).padStart(2, '0');
+            const month = String(expDate.getMonth() + 1).padStart(2, '0');
+            const dateStr = `${day}/${month}/${expDate.getFullYear()}`;
             const message = `Hello ${m.fullName},\n\nThis is a gentle reminder from Fitness Fanatic that your membership is expiring on ${dateStr}.\n\nPlease renew your membership on time to continue your fitness journey!\n\nThank you!`;
             
             await waClient.sendMessage(chatId, message);
