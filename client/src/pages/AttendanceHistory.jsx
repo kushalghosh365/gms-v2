@@ -133,7 +133,7 @@ const AttendanceHistory = () => {
                   </td>
                   <td className="px-6 py-4 flex items-center space-x-3">
                     <img 
-                      src={log.photo ? `/${log.photo}` : 'https://via.placeholder.com/35'} 
+                      src={log.photo ? (log.photo.startsWith("http") ? log.photo : `/${log.photo}`) : 'https://via.placeholder.com/35'} 
                       className="w-8 h-8 rounded-full object-cover"
                       alt=""
                     />
