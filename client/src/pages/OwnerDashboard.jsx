@@ -8,10 +8,13 @@ const OwnerDashboard = () => {
   const [showExpiryModal, setShowExpiryModal] = useState(false);
   
   // WhatsApp States
-  const [waStatus, setWaStatus] = useState('DISCONNECTED');
+  const [waStatus, setWaStatus] = useState('LOADING');
   const [waQR, setWaQR] = useState(null);
   const [isSendingWa, setIsSendingWa] = useState(false);
   const [waMessage, setWaMessage] = useState('');
+  const [waError, setWaError] = useState(false);
+
+  const WA_URL = import.meta.env.VITE_WA_URL || '';
 
 
 
@@ -33,12 +36,20 @@ const OwnerDashboard = () => {
 
 
   const checkWaStatus = async () => {
+    if (!WA_URL) {
+      setWaError(true);
+      setWaStatus('ERROR');
+      return;
+    }
     try {
-      const res = await axios.get((import.meta.env.VITE_WA_URL || '') + '/api/admin/whatsapp/status');
+      const res = await axios.get(WA_URL + '/api/admin/whatsapp/status');
       setWaStatus(res.data.status);
       setWaQR(res.data.qr);
+      setWaError(false);
     } catch (err) {
       console.error('Failed to get WA status', err);
+      setWaError(true);
+      setWaStatus('ERROR');
     }
   };
 
@@ -59,7 +70,7 @@ const OwnerDashboard = () => {
     setIsSendingWa(true);
     setWaMessage('Sending...');
     try {
-      const res = await axios.post((import.meta.env.VITE_WA_URL || '') + '/api/admin/whatsapp/send-reminders', {
+      const res = await axios.post(WA_URL + '/api/admin/whatsapp/send-reminders', {
         members: expiringMembers
       });
       setWaMessage(res.data.message);
@@ -192,7 +203,17 @@ const OwnerDashboard = () => {
 
               {waStatus !== 'CONNECTED' && (
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col items-center text-center space-y-4 shadow-inner">
-                  {waStatus === 'QR_READY' && waQR ? (
+                  {waError ? (
+                    <div className="flex flex-col items-center py-4 space-y-3">
+                      <div className="p-3 bg-red-100 rounded-full">
+                        <MessageCircle size={24} className="text-red-500" />
+                      </div>
+                      <p className="text-sm font-bold text-red-600">WhatsApp Bot Server-এ সংযোগ হচ্ছে না।</p>
+                      <p className="text-xs text-slate-400 max-w-xs">
+                        Render-এ <b>whatsapp-bot</b> সার্ভিসটি ডিপ্লয় করুন এবং Vercel-এ <b>VITE_WA_URL</b> সেট করুন।
+                      </p>
+                    </div>
+                  ) : waStatus === 'QR_READY' && waQR ? (
                     <>
                       <p className="text-sm font-bold text-slate-700">Link Your WhatsApp Account</p>
                       <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
@@ -205,7 +226,7 @@ const OwnerDashboard = () => {
                   ) : (
                     <div className="flex flex-col items-center py-6 space-y-3">
                       <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                      <p className="text-sm font-bold text-slate-500">Generating WhatsApp QR code... Please wait a moment.</p>
+                      <p className="text-sm font-bold text-slate-500">WhatsApp QR code তৈরি হচ্ছে... একটু অপেক্ষা করুন।</p>
                     </div>
                   )}
                 </div>
