@@ -120,7 +120,7 @@ const MemberList = () => {
   const handleSendQR = async (m) => {
     setSendQrStatus(prev => ({ ...prev, [m._id]: 'sending' }));
     try {
-      const res = await axios.post('/api/admin/whatsapp/send-qr', {
+      const res = await axios.post((import.meta.env.VITE_WA_URL || '') + '/api/admin/whatsapp/send-qr', {
         phone: m.phone,
         name: m.fullName,
         whatsapp: m.whatsapp

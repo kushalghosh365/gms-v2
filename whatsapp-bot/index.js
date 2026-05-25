@@ -1,12 +1,19 @@
 require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
+const qrcodeLib = require('qrcode');
 const cron = require('node-cron');
 const mysql = require('mysql2/promise');
 const path = require('path');
 const fs = require('fs');
 
-// Create MySQL connection pool
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+// MySQL connection pool
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
@@ -17,6 +24,9 @@ const pool = mysql.createPool({
     connectionLimit: 10,
     queueLimit: 0
 });
+
+let waStatus = 'DISCONNECTED';
+let waQR = null;
 
 // Initialize WhatsApp Client
 let waClient = new Client({
@@ -37,107 +47,165 @@ let waClient = new Client({
     }
 });
 
-waClient.on('qr', (qr) => {
+waClient.on('qr', async (qr) => {
     console.log('\n--- SCAN THIS QR CODE WITH WHATSAPP ---');
     qrcode.generate(qr, { small: true });
+    
+    // Also save for API
+    if (waStatus !== 'CONNECTED') {
+        waStatus = 'QR_READY';
+        try {
+            waQR = await qrcodeLib.toDataURL(qr);
+        } catch (e) {
+            console.error('QR Generate Error', e);
+        }
+    }
 });
 
 waClient.on('authenticated', () => {
     console.log('WhatsApp Client authenticated successfully!');
+    waStatus = 'CONNECTED';
+    waQR = null;
 });
 
 waClient.on('ready', () => {
     console.log('WhatsApp Client is ready and connected!');
+    waStatus = 'CONNECTED';
+    waQR = null;
 });
 
 waClient.on('auth_failure', (msg) => {
     console.error('WhatsApp Auth Failure', msg);
+    waStatus = 'DISCONNECTED';
+    waQR = null;
 });
 
 waClient.on('disconnected', async (reason) => {
     console.log('WhatsApp disconnected', reason);
+    waStatus = 'DISCONNECTED';
+    waQR = null;
     try {
         await waClient.destroy();
     } catch (err) {
         console.error('Error destroying client on disconnect', err);
     }
     
-    // Attempt to restart
-    waClient.initialize().catch(e => console.error("Re-init failed", e));
+    // Clear auth folder
+    const authDir = path.join(__dirname, '.wwebjs_auth');
+    if (fs.existsSync(authDir)) {
+        try { fs.rmSync(authDir, { recursive: true, force: true }); } catch (e) {}
+    }
+    
+    setTimeout(() => waClient.initialize().catch(e => console.error("Re-init failed", e)), 3000);
 });
 
 waClient.initialize().catch(err => {
     console.error('Failed to initialize WhatsApp Client:', err);
 });
 
-// Helper function to send messages
-async function sendReminderMessages() {
-    console.log('Running daily check for expiring members...');
-    if (!waClient || !waClient.info) {
-        console.log('WhatsApp is not ready yet. Skipping this run.');
-        return;
-    }
-
-    try {
-        const [members] = await pool.query("SELECT * FROM members WHERE isDeleted = 0 AND membershipStatus = 'Valid'");
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        let successCount = 0;
-
-        for (const m of members) {
-            if (!m.expiryDate) continue;
-
-            const expDate = new Date(m.expiryDate);
-            expDate.setHours(0, 0, 0, 0);
-
-            // Calculate diff in days
-            const diffTime = expDate.getTime() - today.getTime();
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-            // Send reminder exactly 5 days before, 2 days before, and 1 day before
-            if (diffDays === 5 || diffDays === 2 || diffDays === 1) {
-                let phoneStr = m.whatsapp || m.phone;
-                if (!phoneStr) continue;
-
-                let phone = phoneStr.replace(/\D/g, '');
-                if (phone.length === 10) phone = `91${phone}`;
-                const chatId = `${phone}@c.us`;
-
-                try {
-                    const isRegistered = await waClient.isRegisteredUser(chatId);
-                    if (!isRegistered) {
-                        console.log(`Number not on WhatsApp: ${phone}`);
-                        continue;
-                    }
-
-                    const day = String(expDate.getDate()).padStart(2, '0');
-                    const month = String(expDate.getMonth() + 1).padStart(2, '0');
-                    const dateStr = `${day}/${month}/${expDate.getFullYear()}`;
-                    
-                    const message = `Hello ${m.fullName},\n\nThis is a gentle reminder from GymPro V2 that your membership is expiring on ${dateStr} (in ${diffDays} days).\n\nPlease renew your membership on time to continue your fitness journey!\n\nThank you!`;
-
-                    await waClient.sendMessage(chatId, message);
-                    console.log(`Reminder sent to ${m.fullName} (${phone})`);
-                    successCount++;
-                    
-                    // Delay to avoid spam bans
-                    await new Promise(resolve => setTimeout(resolve, 3000));
-                } catch (err) {
-                    console.error(`Failed to send to ${phone}`, err);
-                }
-            }
-        }
-        
-        console.log(`Finished sending reminders. Total sent: ${successCount}`);
-    } catch (dbErr) {
-        console.error('Database error during reminder check:', dbErr);
-    }
-}
-
-// Schedule the cron job to run every day at 10:00 AM
-cron.schedule('0 10 * * *', () => {
-    sendReminderMessages();
+// ======================
+// API ROUTES
+// ======================
+app.get('/', (req, res) => {
+    res.send("WhatsApp Bot is running.");
 });
 
-console.log('WhatsApp Bot service started. Waiting for connection...');
+app.get('/api/admin/whatsapp/status', (req, res) => {
+    res.json({ status: waStatus, qr: waQR });
+});
+
+app.post('/api/admin/whatsapp/send-reminders', async (req, res) => {
+    if (waStatus !== 'CONNECTED') {
+        return res.status(400).json({ error: 'WhatsApp is not connected' });
+    }
+    const { members } = req.body;
+    let successCount = 0;
+    let failedList = [];
+
+    for (const m of members) {
+        let phoneStr = m.whatsapp || m.phone;
+        if (!phoneStr) continue;
+
+        let phone = phoneStr.replace(/\D/g, '');
+        if (phone.length === 10) phone = `91${phone}`;
+        const chatId = `${phone}@c.us`;
+
+        try {
+            const isRegistered = await waClient.isRegisteredUser(chatId);
+            if (!isRegistered) {
+                console.log(`Number not on WhatsApp: ${phone}`);
+                failedList.push(m.fullName);
+                continue;
+            }
+
+            const expDate = new Date(m.expiryDate);
+            const day = String(expDate.getDate()).padStart(2, '0');
+            const month = String(expDate.getMonth() + 1).padStart(2, '0');
+            const dateStr = `${day}/${month}/${expDate.getFullYear()}`;
+            
+            // Diff days
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const exp = new Date(m.expiryDate);
+            exp.setHours(0,0,0,0);
+            const diffDays = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            
+            let message = '';
+            if (diffDays === 0) {
+                 message = `Hello ${m.fullName},\n\nThis is a gentle reminder from GymPro V2 that your membership expires TODAY (${dateStr}).\n\nPlease renew your membership on time to continue your fitness journey!\n\nThank you!`;
+            } else {
+                 message = `Hello ${m.fullName},\n\nThis is a gentle reminder from GymPro V2 that your membership is expiring on ${dateStr} (in ${diffDays} days).\n\nPlease renew your membership on time to continue your fitness journey!\n\nThank you!`;
+            }
+
+            await waClient.sendMessage(chatId, message);
+            successCount++;
+            await new Promise(resolve => setTimeout(resolve, 1500));
+        } catch (error) {
+            console.error(`Failed to send to ${phone}`, error);
+            failedList.push(m.fullName);
+        }
+    }
+
+    let resultMsg = `Sent ${successCount} reminders.`;
+    if (failedList.length > 0) {
+        resultMsg += ` Failed for ${failedList.length} members (Invalid WA number).`;
+    }
+    res.json({ message: resultMsg });
+});
+
+app.post('/api/admin/whatsapp/send-qr', async (req, res) => {
+    if (waStatus !== 'CONNECTED') {
+        return res.status(400).json({ error: 'WhatsApp is not connected' });
+    }
+    try {
+        const { phone, name, whatsapp } = req.body;
+        let phoneStr = whatsapp || phone;
+        if (!phoneStr) return res.status(400).json({ error: 'No WhatsApp number available' });
+
+        let cleanPhone = phoneStr.replace(/\D/g, '');
+        if (cleanPhone.length === 10) cleanPhone = `91${cleanPhone}`;
+        const chatId = `${cleanPhone}@c.us`;
+
+        const isRegistered = await waClient.isRegisteredUser(chatId);
+        if (!isRegistered) {
+            return res.status(400).json({ error: 'Number not registered on WhatsApp' });
+        }
+
+        // Generate QR code as base64 image
+        const qrBuffer = await qrcodeLib.toBuffer(phone, { type: 'png', width: 400, margin: 2 });
+        const { MessageMedia } = require('whatsapp-web.js');
+        const media = new MessageMedia('image/png', qrBuffer.toString('base64'), `${name}_QR.png`);
+
+        await waClient.sendMessage(chatId, media, { caption: `🏋️ *${name}* - Gym QR Code\nScan this code at the kiosk for attendance.` });
+
+        res.json({ message: `QR Code sent to ${name}'s WhatsApp!` });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Start Server
+const PORT = process.env.PORT || 4000;
+app.listen(PORT, () => {
+    console.log(`WhatsApp Bot Server is running on port ${PORT}`);
+});

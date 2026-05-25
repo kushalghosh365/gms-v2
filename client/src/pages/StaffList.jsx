@@ -76,7 +76,7 @@ const StaffList = () => {
   const handleSendQR = async (s) => {
     setSendQrStatus(prev => ({ ...prev, [s._id]: 'sending' }));
     try {
-      await axios.post('/api/admin/whatsapp/send-qr', { phone: s.phone, name: s.fullName, whatsapp: s.whatsapp });
+      await axios.post((import.meta.env.VITE_WA_URL || '') + '/api/admin/whatsapp/send-qr', { phone: s.phone, name: s.fullName, whatsapp: s.whatsapp });
       setSendQrStatus(prev => ({ ...prev, [s._id]: 'sent' }));
       setTimeout(() => setSendQrStatus(prev => { const { [s._id]: _, ...rest } = prev; return rest; }), 3000);
     } catch (err) {
