@@ -48,6 +48,22 @@ function AppContent() {
     setIsAuthenticated(false);
   };
 
+  const getLinkClass = (path, type = 'normal') => {
+    const isActive = location.pathname === path;
+    const base = "flex items-center space-x-3 p-3 rounded-lg transition-all duration-200 ";
+    if (type === 'owner') {
+      return base + (isActive 
+        ? "border-2 border-rose-500 bg-rose-500/20 text-rose-400 font-black shadow-[0_0_15px_rgba(244,63,94,0.15)] mt-2" 
+        : "hover:bg-slate-800 text-rose-400 border border-rose-500/20 hover:border-rose-500/40 mt-2");
+    }
+    if (type === 'indigo') {
+      return base + (isActive 
+        ? "border border-indigo-500 bg-indigo-500/20 text-indigo-300 font-bold" 
+        : "hover:bg-slate-800 text-indigo-300 border border-indigo-500/10 hover:border-indigo-500/30");
+    }
+    return base + (isActive ? "bg-slate-800 text-indigo-400 font-bold" : "hover:bg-slate-800 text-slate-300");
+  };
+
   if (!isKiosk && isSetup === null) {
     return <div className="min-h-screen flex items-center justify-center bg-slate-100 font-bold text-slate-500">Loading...</div>;
   }
@@ -64,29 +80,29 @@ function AppContent() {
             <span className="text-xl font-bold text-white tracking-wide">Fitness Fanatic</span>
           </div>
           <nav className="flex-1 p-4 space-y-2">
-            <Link to="/" className="flex items-center space-x-3 p-3 rounded-lg hover:bg-slate-800 transition">
+            <Link to="/" className={getLinkClass('/')}>
               <LayoutDashboard size={20} />
               <span>Owner Dashboard</span>
             </Link>
-            <Link to="/members" className="flex items-center space-x-3 p-3 rounded-lg hover:bg-slate-800 transition">
+            <Link to="/members" className={getLinkClass('/members')}>
               <Users size={20} />
               <span>Member List</span>
             </Link>
-            <Link to="/attendance" className="flex items-center space-x-3 p-3 rounded-lg hover:bg-slate-800 transition">
+            <Link to="/attendance" className={getLinkClass('/attendance')}>
               <ArrowRightLeft size={20} />
               <span>Attendance History</span>
             </Link>
-            <Link to="/register" className="flex items-center space-x-3 p-3 rounded-lg hover:bg-slate-800 transition">
+            <Link to="/register" className={getLinkClass('/register')}>
               <UserPlus size={20} />
               <span>New Registration</span>
             </Link>
-            <Link to="/confirmations" className="flex items-center space-x-3 p-3 rounded-lg hover:bg-slate-800 transition border border-indigo-500/30 bg-indigo-500/10 text-indigo-300">
+            <Link to="/confirmations" className={getLinkClass('/confirmations', 'indigo')}>
               <CheckSquare size={20} />
               <span>Payment Confirmations</span>
             </Link>
-            <Link to="/owner-control" className="flex items-center space-x-3 p-3 rounded-lg hover:bg-slate-800 transition border-2 border-rose-500 bg-rose-500/10 shadow-[0_0_15px_rgba(244,63,94,0.15)] mt-2">
-              <Lock size={20} className="text-rose-500" />
-              <span className="text-rose-500 font-black tracking-wide">Owner Control</span>
+            <Link to="/owner-control" className={getLinkClass('/owner-control', 'owner')}>
+              <Lock size={20} />
+              <span>Owner Control</span>
             </Link>
             <div className="pt-4 mt-4 border-t border-slate-800 space-y-2">
               <Link to="/kiosk" className="flex items-center space-x-3 p-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 transition">

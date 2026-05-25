@@ -71,6 +71,7 @@ function initializeWhatsApp() {
                 '--disable-features=site-per-process',
                 '--disable-extensions',
                 '--disable-component-update',
+                '--blink-settings=imagesEnabled=false',
                 '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
             ],
             executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
@@ -133,7 +134,49 @@ function initializeWhatsApp() {
         setTimeout(initializeWhatsApp, 3000);
     });
 
-    waClient.initialize().catch(err => {
+    waClient.initialize().then(async () => {
+        try {
+            const browser = waClient.pupBrowser;
+            if (browser) {
+                // Set interception for already opened pages (like the WhatsApp Web main page)
+                const pages = await browser.pages();
+                for (const page of pages) {
+                    await page.setRequestInterception(true);
+                    page.on('request', (req) => {
+                        const resourceType = req.resourceType();
+                        if (['image', 'media', 'font'].includes(resourceType)) {
+                            req.abort();
+                        } else {
+                            req.continue();
+                        }
+                    });
+                }
+                // Set interception for any newly opened target page
+                browser.on('targetcreated', async (target) => {
+                    if (target.type() === 'page') {
+                        try {
+                            const page = await target.page();
+                            if (page) {
+                                await page.setRequestInterception(true);
+                                page.on('request', (req) => {
+                                    const resourceType = req.resourceType();
+                                    if (['image', 'media', 'font'].includes(resourceType)) {
+                                        req.abort();
+                                    } else {
+                                        req.continue();
+                                    }
+                                });
+                            }
+                        } catch (targetErr) {
+                            console.error('Error setting interception on new page:', targetErr.message);
+                        }
+                    }
+                });
+            }
+        } catch (e) {
+            console.error('Failed to setup request interception:', e.message);
+        }
+    }).catch(err => {
         console.error('Failed to initialize WhatsApp Client:', err);
     });
 }
