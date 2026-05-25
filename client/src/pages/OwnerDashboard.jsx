@@ -6,9 +6,21 @@ const OwnerDashboard = () => {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showExpiryModal, setShowExpiryModal] = useState(false);
-  
 
+  const fetchMembers = async () => {
+    try {
+      const res = await axios.get('/api/members');
+      setMembers(res.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
+    fetchMembers();
+  }, []);
 
   const today = new Date().toISOString().split('T')[0];
   
@@ -29,6 +41,15 @@ const OwnerDashboard = () => {
     const todayLog = m.attendance?.find(a => a.date === today);
     return todayLog && todayLog.status === 'IN';
   });
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
+        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-slate-500 font-black">Loading Dashboard...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
