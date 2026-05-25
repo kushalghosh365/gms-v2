@@ -54,7 +54,9 @@ let waClient = null;
 
 function initializeWhatsApp() {
     waClient = new Client({
-        authStrategy: new LocalAuth(),
+        authStrategy: new LocalAuth({
+            dataPath: path.join(__dirname, '.wwebjs_auth')
+        }),
         puppeteer: {
             headless: true,
             args: ['--no-sandbox', '--disable-setuid-sandbox']
@@ -76,13 +78,40 @@ function initializeWhatsApp() {
         console.log('WhatsApp Client is ready!');
     });
 
-    waClient.on('disconnected', (reason) => {
-        console.log('WhatsApp disconnected', reason);
+    waClient.on('auth_failure', (msg) => {
+        console.error('WhatsApp Auth Failure', msg);
         waStatus = 'DISCONNECTED';
         waQR = null;
     });
 
-    waClient.initialize();
+    waClient.on('disconnected', async (reason) => {
+        console.log('WhatsApp disconnected', reason);
+        waStatus = 'DISCONNECTED';
+        waQR = null;
+        try {
+            await waClient.destroy();
+        } catch (err) {
+            console.error('Error destroying client on disconnect', err);
+        }
+
+        // Force cleanup of session folder on disconnect
+        const authDir = path.join(__dirname, '.wwebjs_auth');
+        if (fs.existsSync(authDir)) {
+            try {
+                fs.rmSync(authDir, { recursive: true, force: true });
+                console.log('WhatsApp disconnected: Auth folder cleared.');
+            } catch (err) {
+                console.error('Failed to clear auth folder on disconnect', err);
+            }
+        }
+
+        // Schedule reinitialization
+        setTimeout(initializeWhatsApp, 3000);
+    });
+
+    waClient.initialize().catch(err => {
+        console.error('Failed to initialize WhatsApp Client:', err);
+    });
 }
 
 initializeWhatsApp();
@@ -136,7 +165,7 @@ sequelize.authenticate()
 const cleanupStaleAttendance = async () => {
     try {
         const today = new Date().toISOString().split('T')[0];
-        
+
         // Checkout Staff from previous days
         const staffs = await Staff.findAll();
         for (let staff of staffs) {
@@ -186,11 +215,11 @@ const cleanupStaleAttendance = async () => {
 cron.schedule('59 23 * * *', async () => {
     console.log('Running Midnight Auto-Checkout...');
     await cleanupStaleAttendance();
-    
+
     // Also checkout today's remaining INs just in case
     try {
         const today = new Date().toISOString().split('T')[0];
-        
+
         const staffs = await Staff.findAll();
         for (let staff of staffs) {
             let attendance = Array.isArray(staff.attendance) ? [...staff.attendance] : [];
@@ -288,36 +317,36 @@ app.post('/api/admin/send-otp', async (req, res) => {
     if (!phone) return res.status(400).json({ message: 'Phone is required' });
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     otpStore[phone] = otp;
-    
+
     console.log(`[OTP] Sent OTP ${otp} to phone ${phone}`);
     if (waClient && waStatus === 'CONNECTED') {
         let waPhone = phone.replace(/\D/g, '');
         if (waPhone.length === 10) waPhone = `91${waPhone}`;
         try {
             await waClient.sendMessage(`${waPhone}@c.us`, `Your Gym Management System OTP is: ${otp}`);
-        } catch(e) {
-             console.error("Failed to send OTP via WA", e);
+        } catch (e) {
+            console.error("Failed to send OTP via WA", e);
         }
     }
-    
+
     res.json({ message: 'OTP sent successfully (check terminal or WhatsApp if connected)' });
 });
 
 app.post('/api/admin/register', async (req, res) => {
     try {
         const { username, email, phone, password, confirmPassword, ownerControlPassword, confirmOwnerControlPassword, otp } = req.body;
-        
+
         const count = await Admin.count();
         if (count > 0) return res.status(403).json({ message: 'Admin already exists. Registration locked.' });
-        
+
         if (password !== confirmPassword) return res.status(400).json({ message: 'Passwords do not match' });
         if (ownerControlPassword !== confirmOwnerControlPassword) return res.status(400).json({ message: 'Owner Control passwords do not match' });
-        
+
         if (otpStore[phone] !== otp) return res.status(400).json({ message: 'Invalid OTP' });
-        
+
         await Admin.create({ username, email, phone, password, ownerControlPassword });
         delete otpStore[phone]; // Clear OTP
-        
+
         res.status(201).json({ message: 'Admin registered successfully' });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -329,7 +358,7 @@ app.post('/api/admin/login', async (req, res) => {
         const { username, password } = req.body;
         const admin = await Admin.findOne({ where: { username, password } });
         if (!admin) return res.status(401).json({ message: 'Invalid username or password' });
-        
+
         res.json({ message: 'Login successful', admin: { id: admin.id, _id: admin.id, username: admin.username } });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -341,7 +370,7 @@ app.post('/api/admin/verify-owner-password', async (req, res) => {
         const { ownerControlPassword } = req.body;
         const admin = await Admin.findOne();
         if (!admin) return res.status(404).json({ message: 'Admin not found' });
-        
+
         if (admin.ownerControlPassword === ownerControlPassword) {
             res.json({ success: true });
         } else {
@@ -355,22 +384,22 @@ app.post('/api/admin/verify-owner-password', async (req, res) => {
 app.put('/api/admin/edit-register', async (req, res) => {
     try {
         const { phone, password, confirmPassword, ownerControlPassword, confirmOwnerControlPassword, otp } = req.body;
-        
+
         if (password !== confirmPassword) return res.status(400).json({ message: 'Passwords do not match' });
         if (ownerControlPassword !== confirmOwnerControlPassword) return res.status(400).json({ message: 'Owner Control passwords do not match' });
-        
+
         if (otpStore[phone] !== otp) return res.status(400).json({ message: 'Invalid OTP' });
-        
+
         const admin = await Admin.findOne();
         if (!admin) return res.status(404).json({ message: 'Admin not found' });
-        
+
         admin.phone = phone;
         admin.password = password;
         admin.ownerControlPassword = ownerControlPassword;
         await admin.save();
-        
+
         delete otpStore[phone]; // Clear OTP
-        
+
         res.json({ message: 'Admin details updated successfully' });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -385,7 +414,7 @@ app.get('/api/admin/payment-stats', async (req, res) => {
         const startOfYear = new Date(now.getFullYear(), 0, 1);
         const allPayments = await Payment.findAll();
         const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-        
+
         const stats = {
             monthly: { admission: 0, renewal: 0, total: 0, monthName: months[now.getMonth()] },
             yearlyTotal: 0
@@ -396,7 +425,7 @@ app.get('/api/admin/payment-stats', async (req, res) => {
             if (pDate >= startOfMonth) {
                 if (p.type === 'Admission') stats.monthly.admission += p.amount;
                 else if (p.type === 'Renewal') stats.monthly.renewal += p.amount;
-                else if (p.type === 'Manual' || p.type === 'Internal') stats.monthly.renewal += p.amount; 
+                else if (p.type === 'Manual' || p.type === 'Internal') stats.monthly.renewal += p.amount;
             }
             if (pDate >= startOfYear) stats.yearlyTotal += p.amount;
         });
@@ -422,28 +451,66 @@ app.post('/api/admin/whatsapp/logout', async (req, res) => {
             }
         }
 
+        // Clean up server-level session data
         const authDir = path.join(__dirname, '.wwebjs_auth');
         if (fs.existsSync(authDir)) {
-            fs.rmSync(authDir, { recursive: true, force: true });
-            console.log('WhatsApp session data deleted.');
+            try {
+                fs.rmSync(authDir, { recursive: true, force: true });
+                console.log('WhatsApp server session data deleted.');
+            } catch (e) {
+                console.error('Failed to delete server session data:', e.message);
+            }
+        }
+
+        // Also clean up root-level session data if it exists
+        const rootAuthDir = path.join(__dirname, '..', '.wwebjs_auth');
+        if (fs.existsSync(rootAuthDir)) {
+            try {
+                fs.rmSync(rootAuthDir, { recursive: true, force: true });
+                console.log('WhatsApp root session data deleted.');
+            } catch (e) {
+                console.error('Failed to delete root session data:', e.message);
+            }
+        }
+
+        // Clean up cache directories if present
+        const cacheDir = path.join(__dirname, '.wwebjs_cache');
+        if (fs.existsSync(cacheDir)) {
+            try {
+                fs.rmSync(cacheDir, { recursive: true, force: true });
+            } catch (e) { }
+        }
+        const rootCacheDir = path.join(__dirname, '..', '.wwebjs_cache');
+        if (fs.existsSync(rootCacheDir)) {
+            try {
+                fs.rmSync(rootCacheDir, { recursive: true, force: true });
+            } catch (e) { }
         }
 
         waStatus = 'DISCONNECTED';
         waQR = null;
 
-        initializeWhatsApp();
+        // Start a fresh, clean instance
+        setTimeout(initializeWhatsApp, 2000);
 
-        res.json({ message: 'WhatsApp disconnected and all session data cleared.' });
+        res.json({ message: 'WhatsApp disconnected and all session data cleared successfully.' });
     } catch (error) {
         console.error('WhatsApp logout error:', error);
         waStatus = 'DISCONNECTED';
         waQR = null;
+
+        // Forced cleanups
         const authDir = path.join(__dirname, '.wwebjs_auth');
         if (fs.existsSync(authDir)) {
-            fs.rmSync(authDir, { recursive: true, force: true });
+            try { fs.rmSync(authDir, { recursive: true, force: true }); } catch (e) { }
         }
-        initializeWhatsApp();
-        res.json({ message: 'WhatsApp disconnected (forced cleanup).' });
+        const rootAuthDir = path.join(__dirname, '..', '.wwebjs_auth');
+        if (fs.existsSync(rootAuthDir)) {
+            try { fs.rmSync(rootAuthDir, { recursive: true, force: true }); } catch (e) { }
+        }
+
+        setTimeout(initializeWhatsApp, 2000);
+        res.json({ message: 'WhatsApp disconnected (forced cleanup complete).' });
     }
 });
 
@@ -451,18 +518,18 @@ app.post('/api/admin/whatsapp/send-reminders', async (req, res) => {
     if (waStatus !== 'CONNECTED') {
         return res.status(400).json({ error: 'WhatsApp is not connected' });
     }
-    const { members } = req.body; 
+    const { members } = req.body;
     let successCount = 0;
     let failedList = [];
-    
+
     for (const m of members) {
         let phoneStr = m.whatsapp || m.phone;
         if (!phoneStr) continue;
-        
+
         let phone = phoneStr.replace(/\D/g, '');
         if (phone.length === 10) phone = `91${phone}`;
         const chatId = `${phone}@c.us`;
-        
+
         try {
             const isRegistered = await waClient.isRegisteredUser(chatId);
             if (!isRegistered) {
@@ -476,7 +543,7 @@ app.post('/api/admin/whatsapp/send-reminders', async (req, res) => {
             const month = String(expDate.getMonth() + 1).padStart(2, '0');
             const dateStr = `${day}/${month}/${expDate.getFullYear()}`;
             const message = `Hello ${m.fullName},\n\nThis is a gentle reminder from Fitness Fanatic that your membership is expiring on ${dateStr}.\n\nPlease renew your membership on time to continue your fitness journey!\n\nThank you!`;
-            
+
             await waClient.sendMessage(chatId, message);
             successCount++;
             await new Promise(resolve => setTimeout(resolve, 1500));
@@ -485,7 +552,7 @@ app.post('/api/admin/whatsapp/send-reminders', async (req, res) => {
             failedList.push(m.fullName);
         }
     }
-    
+
     let resultMsg = `Sent ${successCount} reminders.`;
     if (failedList.length > 0) {
         resultMsg += ` Failed for ${failedList.length} members (Invalid WA number).`;
@@ -502,7 +569,7 @@ app.post('/api/members/register', upload.single('photo'), async (req, res) => {
             const result = await uploadToCloudinary(req.file.buffer, 'gms-members');
             photoPath = result.secure_url;
         }
-        
+
         const existingMember = await Member.findOne({ where: { phone } });
         if (existingMember) {
             return res.status(400).json({ error: 'Member with this phone number already exists' });
@@ -517,11 +584,11 @@ app.post('/api/members/register', upload.single('photo'), async (req, res) => {
                 if (pack) durationDays = pack.durationDays;
             }
         }
-        
+
         let expiryDate = new Date();
         expiryDate.setDate(expiryDate.getDate() + durationDays);
 
-        const newMember = await Member.create({ 
+        const newMember = await Member.create({
             fullName, email, phone, whatsapp, photo: photoPath,
             memberCategory: memberCategory || 'General',
             packageType: packageType || '1 Month',
@@ -557,10 +624,10 @@ app.post('/api/members/register', upload.single('photo'), async (req, res) => {
 
         const qrCodeData = await QRCode.toDataURL(phone);
 
-        res.status(201).json({ 
-            message: 'Registration successful', 
+        res.status(201).json({
+            message: 'Registration successful',
             member: mapRecord(newMember),
-            qrCode: qrCodeData 
+            qrCode: qrCodeData
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -586,7 +653,7 @@ app.post('/api/staff/register', upload.single('photo'), async (req, res) => {
             const result = await uploadToCloudinary(req.file.buffer, 'gms-staff');
             photo = result.secure_url;
         }
-        
+
         const existingStaff = await Staff.findOne({ where: { phone } });
         if (existingStaff) return res.status(400).json({ error: 'Staff with this phone number already exists' });
 
@@ -612,7 +679,7 @@ app.get('/api/staff', async (req, res) => {
 // Staff: Manual Attendance (by Owner)
 app.post('/api/admin/staff-attendance', async (req, res) => {
     try {
-        const { phone, action, date } = req.body; 
+        const { phone, action, date } = req.body;
         const staff = await Staff.findOne({ where: { phone } });
         if (!staff) return res.status(404).json({ message: 'Staff not found' });
 
@@ -625,7 +692,7 @@ app.post('/api/admin/staff-attendance', async (req, res) => {
                 if (attendanceRecord.status === 'IN') return res.status(400).json({ message: 'Staff is already IN' });
                 if (attendanceRecord.dayType === 'FULL_DAY' || attendanceRecord.dayType === 'HALF_WORK_HALF_LEAVE') return res.status(400).json({ message: 'Your attendance limit 2time in a single day' });
                 if (attendanceRecord.dayType === 'FULL_LEAVE') return res.status(400).json({ message: 'Staff is marked on LEAVE today' });
-                
+
                 attendanceRecord.status = 'IN';
                 attendanceRecord.inTime = 'Manual';
                 attendanceRecord.inTimeTimestamp = Date.now();
@@ -633,9 +700,9 @@ app.post('/api/admin/staff-attendance', async (req, res) => {
                 attendance.push({ date: targetDate, inTime: 'Manual', status: 'IN', dayType: 'PENDING', inTimeTimestamp: Date.now() });
             }
         } else if (action === 'FULL_LEAVE' || action === 'HALF_LEAVE') {
-            const statusToSet = 'OUT'; 
+            const statusToSet = 'OUT';
             let typeToSet = action;
-            
+
             if (attendanceRecord) {
                 if (attendanceRecord.status === 'OUT' && attendanceRecord.dayType === typeToSet) {
                     return res.status(400).json({ message: `Already marked as ${action.replace('_', ' ')}` });
@@ -649,11 +716,11 @@ app.post('/api/admin/staff-attendance', async (req, res) => {
                 if (action === 'FULL_LEAVE' && attendanceRecord.dayType === 'HALF_DAY') {
                     return res.status(400).json({ message: 'Cannot mark Full Leave after working a shift' });
                 }
-                
+
                 if (action === 'HALF_LEAVE' && attendanceRecord.dayType === 'HALF_DAY') {
                     typeToSet = 'HALF_WORK_HALF_LEAVE';
                 }
-                
+
                 attendanceRecord.status = statusToSet;
                 attendanceRecord.outTime = attendanceRecord.outTime || 'Manual';
                 attendanceRecord.dayType = typeToSet;
@@ -700,10 +767,10 @@ app.get('/api/kiosk/profile/:phone', async (req, res) => {
             }
             return res.json(responseData);
         }
-        
+
         let staff = await Staff.findOne({ where: { phone: req.params.phone, isDeleted: false } });
         if (staff) return res.json({ ...mapRecord(staff), userType: 'STAFF' });
-        
+
         res.status(404).json({ message: 'User not found' });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -714,7 +781,7 @@ app.get('/api/kiosk/profile/:phone', async (req, res) => {
 app.post('/api/kiosk/attendance', async (req, res) => {
     try {
         const { phone, action } = req.body;
-        
+
         // Member Logic
         let member = await Member.findOne({ where: { phone } });
         if (member) {
@@ -732,10 +799,10 @@ app.post('/api/kiosk/attendance', async (req, res) => {
                 }
             } else if (action === 'OUT') {
                 if (!attendanceRecord || attendanceRecord.status === 'OUT') return res.status(400).json({ message: "You are not IN, so you can't OUT" });
-                attendanceRecord.status = 'OUT'; 
+                attendanceRecord.status = 'OUT';
                 attendanceRecord.outTime = new Date().toLocaleTimeString();
             }
-            
+
             member.attendance = attendance;
             member.changed('attendance', true);
             await member.save();
@@ -754,21 +821,21 @@ app.post('/api/kiosk/attendance', async (req, res) => {
                     if (attendanceRecord.status === 'IN') return res.status(400).json({ message: 'Already Checked IN' });
                     if (attendanceRecord.dayType === 'FULL_DAY' || attendanceRecord.dayType === 'HALF_WORK_HALF_LEAVE') return res.status(400).json({ message: 'Your attendance limit 2time in a single day' });
                     if (attendanceRecord.dayType === 'FULL_LEAVE') return res.status(400).json({ message: 'Staff is marked on LEAVE today' });
-                    
-                    attendanceRecord.status = 'IN'; 
-                    attendanceRecord.inTime = new Date().toLocaleTimeString(); 
+
+                    attendanceRecord.status = 'IN';
+                    attendanceRecord.inTime = new Date().toLocaleTimeString();
                     attendanceRecord.inTimeTimestamp = Date.now();
                 } else {
                     attendance.push({ date: today, inTime: new Date().toLocaleTimeString(), status: 'IN', dayType: 'PENDING', inTimeTimestamp: Date.now() });
                 }
             } else if (action === 'OUT') {
                 if (!attendanceRecord || attendanceRecord.status === 'OUT') return res.status(400).json({ message: "You are not IN, so you can't OUT" });
-                
+
                 let sessionMs = 0;
                 if (attendanceRecord.inTimeTimestamp) {
                     sessionMs = Date.now() - attendanceRecord.inTimeTimestamp;
                 }
-                
+
                 const fourHoursMs = 4 * 60 * 60 * 1000;
                 if (sessionMs < fourHoursMs) {
                     return res.status(403).json({ message: "You must complete at least 4 hours to checkout." });
@@ -776,8 +843,8 @@ app.post('/api/kiosk/attendance', async (req, res) => {
 
                 attendanceRecord.totalWorkingMs = (attendanceRecord.totalWorkingMs || 0) + sessionMs;
                 attendanceRecord.inTimeTimestamp = null;
-                
-                attendanceRecord.status = 'OUT'; 
+
+                attendanceRecord.status = 'OUT';
                 attendanceRecord.outTime = new Date().toLocaleTimeString();
 
                 if (attendanceRecord.dayType === 'PENDING') {
@@ -788,7 +855,7 @@ app.post('/api/kiosk/attendance', async (req, res) => {
                     attendanceRecord.dayType = 'HALF_WORK_HALF_LEAVE';
                 }
             }
-            
+
             staff.attendance = attendance;
             staff.changed('attendance', true);
             await staff.save();
@@ -807,7 +874,7 @@ app.post('/api/kiosk/payment-request', async (req, res) => {
         const { phone, packageType, durationDays, amount, transactionId } = req.body;
         const member = await Member.findOne({ where: { phone } });
         if (!member) return res.status(404).json({ message: 'Member not found' });
-        
+
         await PaymentRequest.create({
             memberId: member.id,
             packageType,
@@ -815,7 +882,7 @@ app.post('/api/kiosk/payment-request', async (req, res) => {
             amount,
             transactionId
         });
-        
+
         res.json({ message: 'Payment verification requested successfully.' });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -831,7 +898,7 @@ app.post('/api/members/payment', async (req, res) => {
 
         let currentExpiry = member.expiryDate || new Date();
         if (currentExpiry < new Date()) currentExpiry = new Date();
-        
+
         const newExpiry = new Date(currentExpiry);
         newExpiry.setDate(newExpiry.getDate() + (parseInt(months) * 30));
 
@@ -839,7 +906,7 @@ app.post('/api/members/payment', async (req, res) => {
         member.membershipStatus = 'Valid';
         await member.save();
 
-        const amount = months * 1000; 
+        const amount = months * 1000;
         await Payment.create({
             memberId: member.id,
             amount,
@@ -864,7 +931,7 @@ app.post('/api/admin/manual-payment', async (req, res) => {
 
         let currentExpiry = member.expiryDate || new Date();
         if (currentExpiry < new Date()) currentExpiry = new Date();
-        
+
         const newExpiry = new Date(currentExpiry);
         newExpiry.setDate(newExpiry.getDate() + parseInt(durationDays));
 
@@ -900,7 +967,7 @@ app.get('/api/admin/payment-requests', async (req, res) => {
             }],
             order: [['date', 'DESC']]
         });
-        
+
         const mappedRequests = requests.map(req => {
             const r = req.toJSON();
             r._id = r.id;
@@ -908,7 +975,7 @@ app.get('/api/admin/payment-requests', async (req, res) => {
             delete r.member;
             return r;
         });
-        
+
         res.json(mappedRequests);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -921,33 +988,33 @@ app.post('/api/admin/payment-requests/:id/confirm', async (req, res) => {
         const request = await PaymentRequest.findByPk(req.params.id);
         if (!request) return res.status(404).json({ message: 'Request not found' });
         if (request.status !== 'Pending') return res.status(400).json({ message: 'Request already processed' });
-        
+
         const member = await Member.findByPk(request.memberId);
-        
+
         let currentExpiry = member.expiryDate || new Date();
         if (currentExpiry < new Date()) currentExpiry = new Date();
-        
+
         const newExpiry = new Date(currentExpiry);
         newExpiry.setDate(newExpiry.getDate() + parseInt(request.durationDays));
-        
+
         member.expiryDate = newExpiry;
         member.membershipStatus = 'Valid';
         member.paymentNotification = 'Confirmed';
         member.packageType = request.packageType;
         await member.save();
-        
+
         await Payment.create({
             memberId: member.id,
             amount: request.amount,
-            type: 'Renewal', 
+            type: 'Renewal',
             method: 'Kiosk',
             packageType: request.packageType,
             durationDays: request.durationDays
         });
-        
+
         request.status = 'Confirmed';
         await request.save();
-        
+
         res.json({ message: 'Payment Confirmed & Expiry Updated' });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -959,16 +1026,16 @@ app.post('/api/admin/payment-requests/:id/reject', async (req, res) => {
     try {
         const request = await PaymentRequest.findByPk(req.params.id);
         if (!request) return res.status(404).json({ message: 'Request not found' });
-        
+
         const member = await Member.findByPk(request.memberId);
         if (member) {
             member.paymentNotification = 'Rejected';
             await member.save();
         }
-        
+
         request.status = 'Rejected';
         await request.save();
-        
+
         res.json({ message: 'Payment Request Rejected' });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -978,7 +1045,7 @@ app.post('/api/admin/payment-requests/:id/reject', async (req, res) => {
 // 5. Manual Attendance Override (by Owner)
 app.post('/api/admin/manual-attendance', async (req, res) => {
     try {
-        const { phone, action, date } = req.body; 
+        const { phone, action, date } = req.body;
         const member = await Member.findOne({ where: { phone } });
         if (!member) return res.status(404).json({ message: 'Member not found' });
 
@@ -1047,7 +1114,7 @@ app.get('/api/admin/payments', async (req, res) => {
             }],
             order: [['date', 'DESC']]
         });
-        
+
         const mappedPayments = payments.map(p => {
             const pay = p.toJSON();
             pay._id = pay.id;
@@ -1055,7 +1122,7 @@ app.get('/api/admin/payments', async (req, res) => {
             delete pay.member;
             return pay;
         });
-        
+
         res.json(mappedPayments);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -1242,7 +1309,7 @@ app.post('/api/admin/whatsapp/send-qr', async (req, res) => {
         const qrBuffer = await QRCode.toBuffer(phone, { type: 'png', width: 400, margin: 2 });
         const { MessageMedia } = require('whatsapp-web.js');
         const media = new MessageMedia('image/png', qrBuffer.toString('base64'), `${name}_QR.png`);
-        
+
         await waClient.sendMessage(chatId, media, { caption: `🏋️ *${name}* - Gym QR Code\nScan this code at the kiosk for attendance.` });
 
         res.json({ message: `QR Code sent to ${name}'s WhatsApp!` });

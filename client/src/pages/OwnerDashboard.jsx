@@ -11,7 +11,6 @@ const OwnerDashboard = () => {
   const [waStatus, setWaStatus] = useState('DISCONNECTED');
   const [waQR, setWaQR] = useState(null);
   const [isSendingWa, setIsSendingWa] = useState(false);
-  const [isLoggingOutWa, setIsLoggingOutWa] = useState(false);
   const [waMessage, setWaMessage] = useState('');
 
 
@@ -74,24 +73,6 @@ const OwnerDashboard = () => {
     }
   };
 
-  const handleWaLogout = async () => {
-    if (!window.confirm('Are you sure you want to disconnect WhatsApp? All session data will be removed.')) return;
-    setIsLoggingOutWa(true);
-    setWaMessage('');
-    try {
-      const res = await axios.post('/api/admin/whatsapp/logout');
-      setWaStatus('DISCONNECTED');
-      setWaQR(null);
-      setWaMessage(res.data.message);
-      setTimeout(() => setWaMessage(''), 5000);
-    } catch (err) {
-      console.error(err);
-      setWaMessage('Failed to disconnect WhatsApp.');
-      setTimeout(() => setWaMessage(''), 5000);
-    } finally {
-      setIsLoggingOutWa(false);
-    }
-  };
 
   const today = new Date().toISOString().split('T')[0];
   
@@ -187,7 +168,7 @@ const OwnerDashboard = () => {
                 </div>
                 <p className="text-sm font-bold text-slate-600">
                   WhatsApp: <span className={waStatus === 'CONNECTED' ? 'text-green-600' : 'text-orange-500'}>{waStatus}</span>
-                  {waStatus !== 'CONNECTED' && <span className="text-xs text-slate-400 ml-2">(Connect from Dashboard → WhatsApp Login section)</span>}
+                  {waStatus !== 'CONNECTED' && <span className="text-xs text-slate-400 ml-2">(Connect from Owner Control → WhatsApp Login tab)</span>}
                 </p>
               </div>
               <button
@@ -238,75 +219,6 @@ const OwnerDashboard = () => {
         </div>
       )}
 
-      {/* ============================================= */}
-      {/* WHATSAPP LOGIN — Separate Section */}
-      {/* ============================================= */}
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-green-50 to-emerald-50 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`p-3 rounded-2xl text-white shadow-md ${waStatus === 'CONNECTED' ? 'bg-green-500' : 'bg-slate-600'}`}>
-              {waStatus === 'CONNECTED' ? <MessageCircle size={24} /> : <QrCode size={24} />}
-            </div>
-            <div>
-              <h2 className="text-xl font-black text-slate-900">WhatsApp Login</h2>
-              <p className="text-sm font-bold">
-                Status: <span className={waStatus === 'CONNECTED' ? 'text-green-600' : waStatus === 'QR_READY' ? 'text-amber-600' : 'text-slate-500'}>{waStatus}</span>
-              </p>
-            </div>
-          </div>
-          {waStatus === 'CONNECTED' && (
-            <button
-              onClick={handleWaLogout}
-              disabled={isLoggingOutWa}
-              className="flex items-center gap-2 px-5 py-3 bg-red-500 hover:bg-red-600 text-white rounded-2xl font-bold transition disabled:opacity-50"
-            >
-              <LogOut size={16} />
-              {isLoggingOutWa ? 'Disconnecting...' : 'Disconnect'}
-            </button>
-          )}
-        </div>
-
-        <div className="p-6">
-          {waStatus === 'CONNECTED' && (
-            <div className="flex items-center gap-4 p-4 bg-green-50 rounded-2xl border border-green-200">
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                <MessageCircle size={24} className="text-green-600" />
-              </div>
-              <div>
-                <p className="font-black text-green-800">WhatsApp Connected ✅</p>
-                <p className="text-sm text-green-600">You can now send QR codes to members & staff from their cards.</p>
-              </div>
-            </div>
-          )}
-
-          {waStatus === 'QR_READY' && waQR && (
-            <div className="flex flex-col md:flex-row items-center gap-6">
-              <div className="p-4 bg-white rounded-2xl shadow-lg border border-slate-200">
-                <img src={waQR} alt="WhatsApp QR" className="w-48 h-48" />
-              </div>
-              <div>
-                <h3 className="text-lg font-black text-slate-900 mb-2">Scan to Connect</h3>
-                <p className="text-slate-600 text-sm">Open WhatsApp on your phone → Linked Devices → Link a device → Scan this QR.</p>
-                <p className="text-xs text-slate-400 mt-3">QR refreshes automatically every few seconds.</p>
-              </div>
-            </div>
-          )}
-
-          {waStatus === 'DISCONNECTED' && (
-            <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-200">
-              <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center">
-                <QrCode size={24} className="text-slate-500" />
-              </div>
-              <div>
-                <p className="font-black text-slate-700">WhatsApp Not Connected</p>
-                <p className="text-sm text-slate-500">Waiting for QR code to generate... Please wait a moment.</p>
-              </div>
-            </div>
-          )}
-
-          {waMessage && <p className="mt-4 text-sm font-bold text-green-600 bg-green-50 p-3 rounded-xl">{waMessage}</p>}
-        </div>
-      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* Live Attendance Table */}
