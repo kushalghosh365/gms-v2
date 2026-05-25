@@ -103,7 +103,7 @@ function AppContent() {
       )}
 
       {/* Main Content */}
-      <main className={`flex-1 ${isKiosk || isAuthPage ? 'p-0' : 'p-8'}`}>
+      <main className={`flex-1 min-w-0 ${isKiosk || isAuthPage ? 'p-0' : 'p-8'}`}>
         <Routes>
           <Route path="/admin-login" element={<AdminLogin onLogin={handleLogin} />} />
           <Route path="/admin-register" element={<AdminRegister />} />
