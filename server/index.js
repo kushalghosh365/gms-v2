@@ -251,7 +251,6 @@ app.post('/api/admin/send-otp', async (req, res) => {
     otpStore[phone] = otp;
 
     console.log(`[OTP] Sent OTP ${otp} to phone ${phone}`);
-    }
 
     res.json({ message: 'OTP sent successfully (check terminal)' });
 });
