@@ -461,6 +461,19 @@ app.get('/api/admin/whatsapp/status', (req, res) => {
     res.json({ status: waStatus, qr: waQR });
 });
 
+app.get('/api/admin/whatsapp/debug', async (req, res) => {
+    try {
+        if (!waClient || !waClient.pupPage) {
+            return res.status(400).json({ error: 'WhatsApp client or page not initialized yet' });
+        }
+        const screenshotBuffer = await waClient.pupPage.screenshot({ type: 'png' });
+        res.setHeader('Content-Type', 'image/png');
+        res.send(screenshotBuffer);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.post('/api/admin/whatsapp/logout', async (req, res) => {
     try {
         if (waClient) {
@@ -1340,13 +1353,39 @@ app.post('/api/admin/whatsapp/send-qr', async (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-// Use alter:true so new columns (isDeleted) are auto-added on Render restart
+// Helper function to run robust fail-safe migrations for TiDB
+async function runFailSafeMigrations() {
+    console.log('Running fail-safe TiDB schema migrations...');
+    try {
+        await sequelize.query("ALTER TABLE `members` ADD COLUMN `isDeleted` TINYINT(1) DEFAULT 0;");
+        console.log("Migration SUCCESS: Added 'isDeleted' to 'members'.");
+    } catch (e) {
+        // Ignored if column already exists
+    }
+    try {
+        await sequelize.query("ALTER TABLE `members` ADD COLUMN `gender` VARCHAR(255) DEFAULT 'Male';");
+        console.log("Migration SUCCESS: Added 'gender' to 'members'.");
+    } catch (e) {}
+
+    try {
+        await sequelize.query("ALTER TABLE `staffs` ADD COLUMN `isDeleted` TINYINT(1) DEFAULT 0;");
+        console.log("Migration SUCCESS: Added 'isDeleted' to 'staffs'.");
+    } catch (e) {}
+    try {
+        await sequelize.query("ALTER TABLE `staffs` ADD COLUMN `gender` VARCHAR(255) DEFAULT 'Male';");
+        console.log("Migration SUCCESS: Added 'gender' to 'staffs'.");
+    } catch (e) {}
+    console.log('Fail-safe migrations execution complete.');
+}
+
 const { Op } = require('sequelize');
-sequelize.sync({ alter: true }).then(() => {
+sequelize.sync({ alter: true }).then(async () => {
+    await runFailSafeMigrations();
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-}).catch(err => {
-    console.error('DB sync failed:', err);
+}).catch(async err => {
+    console.error('DB sync alter failed, applying fail-safe schema migrations:', err.message);
+    await runFailSafeMigrations();
     // Start anyway so Render doesn't crash
-    app.listen(PORT, () => console.log(`Server running on port ${PORT} (sync failed)`));
+    app.listen(PORT, () => console.log(`Server running on port ${PORT} (running with fail-safe schemas)`));
 });
 
