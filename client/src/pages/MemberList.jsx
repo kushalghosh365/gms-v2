@@ -240,7 +240,7 @@ const MemberList = () => {
             </div>
 
             {/* Admin Controls */}
-            <div className="mt-auto pt-4 border-t border-slate-100 grid grid-cols-5 gap-1.5">
+            <div className="mt-auto pt-4 border-t border-slate-100 grid grid-cols-4 gap-1.5">
               <button
                 onClick={() => handleManualAttendance(m.phone, 'IN', m._id)}
                 className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 active:scale-95 flex flex-col items-center justify-center transition-all"
@@ -272,21 +272,6 @@ const MemberList = () => {
               >
                 <Monitor size={15} />
                 <span className="text-[9px] font-bold mt-1">QR</span>
-              </button>
-              <button
-                onClick={() => handleSendQR(m)}
-                disabled={sendQrStatus[m._id] === 'sending'}
-                className={`p-2 rounded-lg active:scale-95 flex flex-col items-center justify-center transition-all ${
-                  sendQrStatus[m._id] === 'sent' ? 'bg-green-100 text-green-600' :
-                  sendQrStatus[m._id] === 'error' ? 'bg-red-100 text-red-600' :
-                  'bg-teal-50 text-teal-600 hover:bg-teal-100'
-                }`}
-                title="Send QR to WhatsApp"
-              >
-                <Send size={15} />
-                <span className="text-[9px] font-bold mt-1">
-                  {sendQrStatus[m._id] === 'sending' ? '...' : sendQrStatus[m._id] === 'sent' ? '✓' : sendQrStatus[m._id] === 'error' ? '✗' : 'WA'}
-                </span>
               </button>
             </div>
           </div>

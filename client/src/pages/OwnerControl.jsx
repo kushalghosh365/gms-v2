@@ -4,7 +4,6 @@ import { Lock, Wallet, History, Users, Settings as SettingsIcon, Clock, Briefcas
 import * as XLSX from 'xlsx';
 import StaffList from './StaffList';
 import Settings from './Settings';
-import WhatsAppLogin from './WhatsAppLogin';
 
 const PaymentSummary = () => {
     const [paymentStats, setPaymentStats] = useState({ 
@@ -423,7 +422,6 @@ const OwnerControl = () => {
         { id: 'staff', label: 'Staff Sections', icon: Briefcase },
         { id: 'staff-attendance', label: 'Staff Attendance', icon: Clock },
         { id: 'edit-register', label: 'Edit Register', icon: Users },
-        { id: 'whatsapp', label: 'WhatsApp Login', icon: MessageCircle },
         { id: 'settings', label: 'Settings', icon: SettingsIcon },
     ];
 
@@ -460,7 +458,6 @@ const OwnerControl = () => {
                 {activeTab === 'staff' && <StaffList />}
                 {activeTab === 'staff-attendance' && <StaffAttendanceHistory />}
                 {activeTab === 'edit-register' && <EditRegister />}
-                {activeTab === 'whatsapp' && <WhatsAppLogin />}
                 {activeTab === 'settings' && <Settings />}
             </div>
         </div>

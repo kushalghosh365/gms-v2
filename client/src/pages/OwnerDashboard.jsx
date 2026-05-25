@@ -160,30 +160,61 @@ const OwnerDashboard = () => {
               </button>
             </div>
             
-            {/* Send Reminders Button Only */}
-            <div className="bg-slate-50 border-b border-slate-200 p-4 flex items-center justify-between gap-4">
-              <div className="flex items-center space-x-3">
-                <div className={`p-2 rounded-xl text-white ${waStatus === 'CONNECTED' ? 'bg-green-500' : 'bg-slate-400'}`}>
-                  <MessageCircle size={18} />
+            {/* WhatsApp Integration Block */}
+            <div className="bg-slate-50 border-b border-slate-200 p-6 flex flex-col space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className={`p-2 rounded-xl text-white ${waStatus === 'CONNECTED' ? 'bg-green-500' : 'bg-orange-500 animate-pulse'}`}>
+                    <MessageCircle size={20} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-800">
+                      WhatsApp Connection Status: <span className={waStatus === 'CONNECTED' ? 'text-green-600 font-extrabold' : 'text-orange-500 font-extrabold'}>{waStatus}</span>
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">Required only for sending expiration reminders.</p>
+                  </div>
                 </div>
-                <p className="text-sm font-bold text-slate-600">
-                  WhatsApp: <span className={waStatus === 'CONNECTED' ? 'text-green-600' : 'text-orange-500'}>{waStatus}</span>
-                  {waStatus !== 'CONNECTED' && <span className="text-xs text-slate-400 ml-2">(Connect from Owner Control → WhatsApp Login tab)</span>}
-                </p>
+                {waStatus === 'CONNECTED' && (
+                  <button
+                    onClick={handleSendReminders}
+                    disabled={isSendingWa || expiringMembers.length === 0}
+                    className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-black transition-all shadow-md ${
+                      !isSendingWa && expiringMembers.length > 0
+                      ? 'bg-green-500 hover:bg-green-600 text-white' 
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    }`}
+                  >
+                    <MessageCircle size={18} />
+                    <span>{isSendingWa ? 'Sending...' : 'Send Reminders to All'}</span>
+                  </button>
+                )}
               </div>
-              <button
-                onClick={handleSendReminders}
-                disabled={waStatus !== 'CONNECTED' || isSendingWa || expiringMembers.length === 0}
-                className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-black transition-all shadow-md ${
-                  waStatus === 'CONNECTED' && !isSendingWa && expiringMembers.length > 0
-                  ? 'bg-green-500 hover:bg-green-600 text-white' 
-                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                }`}
-              >
-                <MessageCircle size={18} />
-                <span>{isSendingWa ? 'Sending...' : 'Send msg to all expiring'}</span>
-              </button>
-              {waMessage && <p className="text-xs font-bold text-green-600">{waMessage}</p>}
+
+              {waStatus !== 'CONNECTED' && (
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col items-center text-center space-y-4 shadow-inner">
+                  {waStatus === 'QR_READY' && waQR ? (
+                    <>
+                      <p className="text-sm font-bold text-slate-700">Link Your WhatsApp Account</p>
+                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <img src={waQR} alt="WhatsApp QR Code" className="w-48 h-48" />
+                      </div>
+                      <p className="text-xs text-slate-500 max-w-sm">
+                        Open WhatsApp on your phone → Linked Devices → Link a Device, and point your camera to this QR code.
+                      </p>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center py-6 space-y-3">
+                      <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                      <p className="text-sm font-bold text-slate-500">Generating WhatsApp QR code... Please wait a moment.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              {waMessage && (
+                <div className="p-3 bg-emerald-50 text-emerald-800 rounded-xl border border-emerald-100 text-center font-bold text-xs">
+                  {waMessage}
+                </div>
+              )}
             </div>
 
             <div className="overflow-y-auto p-6 space-y-4 flex-1">

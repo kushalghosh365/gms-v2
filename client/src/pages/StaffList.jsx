@@ -405,21 +405,6 @@ const StaffList = () => {
                       <Monitor size={14} />
                       <span className="text-[8px] font-bold mt-1">QR</span>
                     </button>
-                    <button
-                      onClick={() => handleSendQR(s)}
-                      disabled={sendQrStatus[s._id] === 'sending'}
-                      className={`p-1.5 rounded-xl active:scale-95 flex flex-col items-center justify-center transition-all shadow-sm ${
-                        sendQrStatus[s._id] === 'sent' ? 'bg-green-100 text-green-600' :
-                        sendQrStatus[s._id] === 'error' ? 'bg-red-100 text-red-600' :
-                        'bg-teal-50 text-teal-600 hover:bg-teal-100'
-                      }`}
-                      title="Send QR to WhatsApp"
-                    >
-                      <Send size={14} />
-                      <span className="text-[8px] font-bold mt-1">
-                        {sendQrStatus[s._id] === 'sending' ? '...' : sendQrStatus[s._id] === 'sent' ? '✓' : sendQrStatus[s._id] === 'error' ? '✗' : 'WA'}
-                      </span>
-                    </button>
                   </div>
                 </div>
               )
