@@ -1,88 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Users, UserCheck, Calendar, Clock, AlertTriangle, X, Wallet, MessageCircle, QrCode, LogOut } from 'lucide-react';
+import { Users, UserCheck, Calendar, Clock, AlertTriangle, X, Wallet, MessageCircle, QrCode, LogOut, Send } from 'lucide-react';
 
 const OwnerDashboard = () => {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showExpiryModal, setShowExpiryModal] = useState(false);
   
-  // WhatsApp States
-  const [waStatus, setWaStatus] = useState('LOADING');
-  const [waQR, setWaQR] = useState(null);
-  const [isSendingWa, setIsSendingWa] = useState(false);
-  const [waMessage, setWaMessage] = useState('');
-  const [waError, setWaError] = useState(false);
 
-  const WA_URL = import.meta.env.VITE_WA_URL || '';
-
-
-
-  useEffect(() => {
-    fetchMembers();
-  }, []);
-
-  const fetchMembers = async () => {
-    try {
-      const res = await axios.get('/api/members');
-      setMembers(res.data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-
-
-  const checkWaStatus = async () => {
-    if (!WA_URL) {
-      setWaError(true);
-      setWaStatus('ERROR');
-      return;
-    }
-    try {
-      const res = await axios.get(WA_URL + '/api/admin/whatsapp/status');
-      setWaStatus(res.data.status);
-      setWaQR(res.data.qr);
-      setWaError(false);
-    } catch (err) {
-      console.error('Failed to get WA status', err);
-      setWaError(true);
-      setWaStatus('ERROR');
-    }
-  };
-
-  // Check WA status on mount and periodically
-  useEffect(() => {
-    checkWaStatus();
-    const interval = setInterval(checkWaStatus, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleSendReminders = async () => {
-    if (waStatus !== 'CONNECTED') {
-      alert("WhatsApp is not connected! Please scan the QR code first.");
-      return;
-    }
-    if (expiringMembers.length === 0) return;
-
-    setIsSendingWa(true);
-    setWaMessage('Sending...');
-    try {
-      const res = await axios.post(WA_URL + '/api/admin/whatsapp/send-reminders', {
-        members: expiringMembers
-      });
-      setWaMessage(res.data.message);
-      setTimeout(() => setWaMessage(''), 5000);
-    } catch (err) {
-      console.error(err);
-      setWaMessage('Failed to send messages.');
-      setTimeout(() => setWaMessage(''), 5000);
-    } finally {
-      setIsSendingWa(false);
-    }
-  };
 
 
   const today = new Date().toISOString().split('T')[0];
@@ -171,76 +96,40 @@ const OwnerDashboard = () => {
               </button>
             </div>
             
-            {/* WhatsApp Integration Block */}
-            <div className="bg-slate-50 border-b border-slate-200 p-6 flex flex-col space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className={`p-2 rounded-xl text-white ${waStatus === 'CONNECTED' ? 'bg-green-500' : 'bg-orange-500 animate-pulse'}`}>
-                    <MessageCircle size={20} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-800">
-                      WhatsApp Connection Status: <span className={waStatus === 'CONNECTED' ? 'text-green-600 font-extrabold' : 'text-orange-500 font-extrabold'}>{waStatus}</span>
-                    </p>
-                    <p className="text-xs text-slate-400 mt-0.5">Required only for sending expiration reminders.</p>
-                  </div>
-                </div>
-                {waStatus === 'CONNECTED' && (
-                  <button
-                    onClick={handleSendReminders}
-                    disabled={isSendingWa || expiringMembers.length === 0}
-                    className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-black transition-all shadow-md ${
-                      !isSendingWa && expiringMembers.length > 0
-                      ? 'bg-green-500 hover:bg-green-600 text-white' 
-                      : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                    }`}
-                  >
-                    <MessageCircle size={18} />
-                    <span>{isSendingWa ? 'Sending...' : 'Send Reminders to All'}</span>
-                  </button>
-                )}
-              </div>
 
-              {waStatus !== 'CONNECTED' && (
-                <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col items-center text-center space-y-4 shadow-inner">
-                  {waError ? (
-                    <div className="flex flex-col items-center py-4 space-y-3">
-                      <div className="p-3 bg-red-100 rounded-full">
-                        <MessageCircle size={24} className="text-red-500" />
-                      </div>
-                      <p className="text-sm font-bold text-red-600">WhatsApp Bot Server-এ সংযোগ হচ্ছে না।</p>
-                      <p className="text-xs text-slate-400 max-w-xs">
-                        Render-এ <b>whatsapp-bot</b> সার্ভিসটি ডিপ্লয় করুন এবং Vercel-এ <b>VITE_WA_URL</b> সেট করুন।
-                      </p>
-                    </div>
-                  ) : waStatus === 'QR_READY' && waQR ? (
-                    <>
-                      <p className="text-sm font-bold text-slate-700">Link Your WhatsApp Account</p>
-                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                        <img src={waQR} alt="WhatsApp QR Code" className="w-48 h-48" />
-                      </div>
-                      <p className="text-xs text-slate-500 max-w-sm">
-                        Open WhatsApp on your phone → Linked Devices → Link a Device, and point your camera to this QR code.
-                      </p>
-                    </>
-                  ) : (
-                    <div className="flex flex-col items-center py-6 space-y-3">
-                      <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                      <p className="text-sm font-bold text-slate-500">WhatsApp QR code তৈরি হচ্ছে... একটু অপেক্ষা করুন।</p>
-                    </div>
-                  )}
-                </div>
-              )}
-              {waMessage && (
-                <div className="p-3 bg-emerald-50 text-emerald-800 rounded-xl border border-emerald-100 text-center font-bold text-xs">
-                  {waMessage}
-                </div>
-              )}
-            </div>
 
             <div className="overflow-y-auto p-6 space-y-4 flex-1">
               {expiringMembers.length > 0 ? expiringMembers.map(m => {
                 const daysLeft = Math.ceil((new Date(m.expiryDate) - new Date()) / (24 * 60 * 60 * 1000));
+                
+                const handleSendMessage = () => {
+                  const expDate = new Date(m.expiryDate);
+                  const day = String(expDate.getDate()).padStart(2, '0');
+                  const month = String(expDate.getMonth() + 1).padStart(2, '0');
+                  const dateStr = `${day}/${month}/${expDate.getFullYear()}`;
+                  
+                  // Difference in days normalized to local timezone midnight
+                  const todayMidnight = new Date();
+                  todayMidnight.setHours(0,0,0,0);
+                  const expMidnight = new Date(m.expiryDate);
+                  expMidnight.setHours(0,0,0,0);
+                  const diffDays = Math.ceil((expMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24));
+                  
+                  let message = `Hello ${m.fullName},\n\nThis is a gentle reminder from GymPro V2 that your membership is expiring on ${dateStr} (in ${diffDays} days).\n\nPlease renew your membership on time to continue your fitness journey!\n\nThank you!`;
+                  if (diffDays <= 0) {
+                    message = `Hello ${m.fullName},\n\nThis is a gentle reminder from GymPro V2 that your membership expires TODAY (${dateStr}).\n\nPlease renew your membership on time to continue your fitness journey!\n\nThank you!`;
+                  } else if (diffDays === 1) {
+                    message = `Hello ${m.fullName},\n\nThis is a gentle reminder from GymPro V2 that your membership is expiring TOMORROW (${dateStr}).\n\nPlease renew your membership on time to continue your fitness journey!\n\nThank you!`;
+                  }
+                  
+                  const rawPhone = m.whatsapp || m.phone;
+                  let cleanPhone = rawPhone.replace(/\D/g, '');
+                  if (cleanPhone.length === 10) cleanPhone = `91${cleanPhone}`;
+                  
+                  const url = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(message)}`;
+                  window.open(url, '_blank');
+                };
+
                 return (
                   <div key={m._id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
                     <div className="flex items-center space-x-4">
@@ -253,13 +142,22 @@ const OwnerDashboard = () => {
                         <p className="font-bold text-slate-900">{m.fullName}</p>
                         <p className="text-sm text-slate-500 flex items-center space-x-1 mt-1">
                           <MessageCircle size={14} className="text-green-500" />
-                          <span>{m.whatsapp ? m.whatsapp : 'No WhatsApp added'}</span>
+                          <span>{m.whatsapp ? m.whatsapp : m.phone}</span>
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-orange-600">{daysLeft} Days Left</p>
-                      <p className="text-xs text-slate-400">{new Date(m.expiryDate).toLocaleDateString('en-GB')}</p>
+                    <div className="flex items-center space-x-4">
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-orange-600">{daysLeft} Days Left</p>
+                        <p className="text-xs text-slate-400">{new Date(m.expiryDate).toLocaleDateString('en-GB')}</p>
+                      </div>
+                      <button
+                        onClick={handleSendMessage}
+                        className="p-3 bg-green-500 hover:bg-green-600 text-white rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center"
+                        title="Send WhatsApp Reminder"
+                      >
+                        <Send size={16} />
+                      </button>
                     </div>
                   </div>
                 )

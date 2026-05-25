@@ -24,8 +24,7 @@ const MemberList = () => {
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // Send QR state
-  const [sendQrStatus, setSendQrStatus] = useState({});
+
 
   const downloadQRCard = () => {
     if (cardRef.current) {
@@ -117,22 +116,7 @@ const MemberList = () => {
     }
   };
 
-  const handleSendQR = async (m) => {
-    setSendQrStatus(prev => ({ ...prev, [m._id]: 'sending' }));
-    try {
-      const res = await axios.post((import.meta.env.VITE_WA_URL || '') + '/api/admin/whatsapp/send-qr', {
-        phone: m.phone,
-        name: m.fullName,
-        whatsapp: m.whatsapp
-      });
-      setSendQrStatus(prev => ({ ...prev, [m._id]: 'sent' }));
-      setTimeout(() => setSendQrStatus(prev => { const { [m._id]: _, ...rest } = prev; return rest; }), 3000);
-    } catch (err) {
-      setSendQrStatus(prev => ({ ...prev, [m._id]: 'error' }));
-      setTimeout(() => setSendQrStatus(prev => { const { [m._id]: _, ...rest } = prev; return rest; }), 3000);
-      alert(err.response?.data?.error || 'Failed to send QR');
-    }
-  };
+
 
   const filteredMembers = members.filter(m => {
     const matchesSearch = m.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || m.phone.includes(searchTerm);

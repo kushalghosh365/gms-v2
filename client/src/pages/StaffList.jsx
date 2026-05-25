@@ -21,8 +21,7 @@ const StaffList = () => {
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // Send QR state
-  const [sendQrStatus, setSendQrStatus] = useState({});
+
 
   useEffect(() => {
     fetchStaff();
@@ -73,18 +72,7 @@ const StaffList = () => {
     }
   };
 
-  const handleSendQR = async (s) => {
-    setSendQrStatus(prev => ({ ...prev, [s._id]: 'sending' }));
-    try {
-      await axios.post((import.meta.env.VITE_WA_URL || '') + '/api/admin/whatsapp/send-qr', { phone: s.phone, name: s.fullName, whatsapp: s.whatsapp });
-      setSendQrStatus(prev => ({ ...prev, [s._id]: 'sent' }));
-      setTimeout(() => setSendQrStatus(prev => { const { [s._id]: _, ...rest } = prev; return rest; }), 3000);
-    } catch (err) {
-      setSendQrStatus(prev => ({ ...prev, [s._id]: 'error' }));
-      setTimeout(() => setSendQrStatus(prev => { const { [s._id]: _, ...rest } = prev; return rest; }), 3000);
-      alert(err.response?.data?.error || 'Failed to send QR');
-    }
-  };
+
 
   const downloadQRCard = () => {
     if (cardRef.current) {
