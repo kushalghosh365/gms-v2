@@ -59,17 +59,36 @@ function initializeWhatsApp() {
         }),
         puppeteer: {
             headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--disable-gpu'
+            ],
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
         }
     });
 
     waClient.on('qr', async (qr) => {
-        waStatus = 'QR_READY';
-        try {
-            waQR = await QRCode.toDataURL(qr);
-        } catch (e) {
-            console.error('QR Generate Error', e);
+        // Prevent generating QR if already authenticated or connected
+        if (waStatus !== 'CONNECTED') {
+            waStatus = 'QR_READY';
+            try {
+                waQR = await QRCode.toDataURL(qr);
+            } catch (e) {
+                console.error('QR Generate Error', e);
+            }
         }
+    });
+
+    // Instantly fires as soon as the user scans the QR on their phone
+    waClient.on('authenticated', () => {
+        waStatus = 'CONNECTED';
+        waQR = null;
+        console.log('WhatsApp Client authenticated successfully!');
     });
 
     waClient.on('ready', () => {
