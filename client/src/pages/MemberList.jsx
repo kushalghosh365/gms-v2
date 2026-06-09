@@ -455,7 +455,6 @@ const MemberList = () => {
             </div>
           </div>
         </div>
-      )}
 
       {/* Future Edit Modal can be added here, similar to the above modals with a form to edit member details */ }
       {editModal && (
@@ -471,5 +470,5 @@ const MemberList = () => {
     </div>
   );
 };
-
+)}
 export default MemberList;
