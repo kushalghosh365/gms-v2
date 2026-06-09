@@ -11,7 +11,7 @@ const Member = sequelize.define('Member', {
     membershipStatus: { type: DataTypes.ENUM('Valid', 'Expired'), defaultValue: 'Expired' },
     expiryDate: { type: DataTypes.DATE },
     plan: { type: DataTypes.STRING },
-    memberCategory: { type: DataTypes.ENUM('General', 'Student', 'Yoga', 'Zumba', 'PT_Average', 'PT_Advanced'), defaultValue: 'General' },
+    memberCategory: { type: DataTypes.STRING, defaultValue: 'General' },
     packageType: { type: DataTypes.STRING },
     attendance: { type: DataTypes.JSON, defaultValue: [] },
     paymentNotification: { type: DataTypes.STRING, defaultValue: null },

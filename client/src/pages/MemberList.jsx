@@ -10,10 +10,11 @@ const MemberList = () => {
   const [filter, setFilter] = useState('All');
   const [loading, setLoading] = useState(true);
   const [statusMessage, setStatusMessage] = useState({});
+  const [settings, setSettings] = useState(null);
 
-  const [paymentModal, setPaymentModal] = useState({ show: false, phone: '', name: '' });
-  const [selectedMonths, setSelectedMonths] = useState(1);
-  const [paymentAmount, setPaymentAmount] = useState(1000);
+  const [paymentModal, setPaymentModal] = useState({ show: false, phone: '', name: '', memberCategory: 'General' });
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [paymentAmount, setPaymentAmount] = useState(0);
 
   const [qrModal, setQrModal] = useState({ show: false, member: null });
   const [detailsModal, setDetailsModal] = useState({ show: false, member: null });
@@ -49,7 +50,10 @@ const MemberList = () => {
     }
   };
 
-  useEffect(() => { fetchMembers(); }, []);
+  useEffect(() => {
+    fetchMembers();
+    axios.get('/api/admin/settings').then(res => setSettings(res.data)).catch(console.error);
+  }, []);
 
   const fetchMembers = async () => {
     try {
@@ -60,6 +64,12 @@ const MemberList = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getPackagesForMember = (memberCategory) => {
+    if (!settings) return [];
+    const cat = settings.pricing?.find(c => c.category === (memberCategory || 'General'));
+    return cat ? cat.packages : [];
   };
 
   const handleManualAttendance = async (phone, action, memberId) => {
@@ -88,13 +98,16 @@ const MemberList = () => {
   };
 
   const submitManualPayment = async () => {
+    if (!selectedPlan) { alert('Please select a plan'); return; }
     try {
       await axios.post('/api/admin/manual-payment', {
         phone: paymentModal.phone,
-        months: selectedMonths,
+        packageType: selectedPlan.name,
+        durationDays: selectedPlan.durationDays,
         amount: paymentAmount
       });
-      setPaymentModal({ show: false, phone: '', name: '' });
+      setPaymentModal({ show: false, phone: '', name: '', memberCategory: 'General' });
+      setSelectedPlan(null);
       fetchMembers();
     } catch (err) {
       alert('Error: ' + (err.response?.data?.message || err.message));
@@ -241,9 +254,11 @@ const MemberList = () => {
               </button>
               <button
                 onClick={() => {
-                  setPaymentModal({ show: true, phone: m.phone, name: m.fullName });
-                  setPaymentAmount(1000);
-                  setSelectedMonths(1);
+                  const pkgs = getPackagesForMember(m.memberCategory);
+                  const firstPlan = pkgs.length > 0 ? pkgs[0] : null;
+                  setPaymentModal({ show: true, phone: m.phone, name: m.fullName, memberCategory: m.memberCategory || 'General' });
+                  setSelectedPlan(firstPlan);
+                  setPaymentAmount(firstPlan ? firstPlan.price : 0);
                 }}
                 className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 active:scale-95 flex flex-col items-center justify-center transition-all"
               >
@@ -297,27 +312,57 @@ const MemberList = () => {
       {/* Manual Payment Modal */}
       {paymentModal.show && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl animate-in fade-in zoom-in duration-300">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">Manual Payment</h2>
-              <button onClick={() => setPaymentModal({ show: false, phone: '', name: '' })}><X size={24} /></button>
-            </div>
-            <p className="text-slate-600 mb-4">Marking cash payment for <span className="font-bold text-slate-900">{paymentModal.name}</span></p>
-            <div className="space-y-4 mb-6">
-              <p className="text-sm font-bold text-slate-500">Select Months:</p>
-              <div className="grid grid-cols-2 gap-3">
-                {[1, 3, 6, 12].map(m => (
-                  <button key={m} onClick={() => { setSelectedMonths(m); setPaymentAmount(m * 1000); }} className={`p-3 rounded-xl border-2 font-bold transition-all ${selectedMonths === m ? 'border-indigo-600 bg-indigo-50 text-indigo-600' : 'border-slate-100 hover:border-indigo-100'}`}>
-                    {m} Month{m > 1 ? 's' : ''}
-                  </button>
-                ))}
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl animate-in fade-in zoom-in duration-300">
+            <div className="flex justify-between items-center mb-3">
+              <div>
+                <h2 className="text-xl font-bold">Manual Payment</h2>
+                <p className="text-sm text-indigo-600 font-semibold">{paymentModal.name} · <span className="text-slate-500">{paymentModal.memberCategory}</span></p>
               </div>
+              <button onClick={() => { setPaymentModal({ show: false, phone: '', name: '', memberCategory: 'General' }); setSelectedPlan(null); }}><X size={22} /></button>
             </div>
-            <div className="space-y-2 mb-8">
-              <p className="text-sm font-bold text-slate-500">Amount (₹):</p>
-              <input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} className="w-full p-4 rounded-xl border-2 border-slate-100 focus:border-indigo-600 outline-none font-bold text-xl" />
+
+            {/* Plan Packages from Settings */}
+            <div className="mb-4">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Select Plan:</p>
+              {getPackagesForMember(paymentModal.memberCategory).length > 0 ? (
+                <div className="grid grid-cols-2 gap-2">
+                  {getPackagesForMember(paymentModal.memberCategory).map(pkg => (
+                    <button
+                      key={pkg.name}
+                      onClick={() => { setSelectedPlan(pkg); setPaymentAmount(pkg.price); }}
+                      className={`p-3 rounded-xl border-2 font-bold text-sm transition-all text-left ${selectedPlan?.name === pkg.name
+                          ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                          : 'border-slate-100 hover:border-indigo-200 text-slate-700'
+                        }`}
+                    >
+                      <div className="font-black">{pkg.name}</div>
+                      <div className="text-xs text-slate-400 font-semibold">₹{pkg.price}</div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-400">No packages found for this category. Loading settings...</p>
+              )}
             </div>
-            <button onClick={submitManualPayment} className="w-full p-4 bg-indigo-600 text-white rounded-2xl font-black text-lg shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">CONFIRM PAYMENT</button>
+
+            {/* Amount — editable but pre-filled from plan */}
+            <div className="mb-4">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Amount (₹):</p>
+              <input
+                type="number"
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(Number(e.target.value))}
+                className="w-full p-3 rounded-xl border-2 border-slate-100 focus:border-indigo-500 outline-none font-bold text-lg"
+              />
+            </div>
+
+            <button
+              onClick={submitManualPayment}
+              disabled={!selectedPlan}
+              className="w-full p-4 bg-indigo-600 text-white rounded-2xl font-black text-base shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              CONFIRM PAYMENT
+            </button>
           </div>
         </div>
       )}

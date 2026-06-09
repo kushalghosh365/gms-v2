@@ -22,7 +22,7 @@ const MemberKiosk = () => {
       .catch(console.error);
   }, []);
   
-  const UPI_ID = "kushalghosh7363071664@okaxis";
+  const UPI_ID = "swarnakaramarnath1997@oksbi";
   const PAYEE_NAME = "Gpay";
 
   // Initialize Scanner
@@ -247,6 +247,7 @@ const MemberKiosk = () => {
               <span className="text-lg font-black text-slate-800 uppercase tracking-[0.2em]">Touch to Scan</span>
             </div>
           </button>
+          <p className="text-slate-400 text-lg font-medium">© 2026 Fitness Fanatic. All rights reserved. | Crafted by TechUpwards</p>
         </div>
       )}
 
@@ -399,16 +400,16 @@ const MemberKiosk = () => {
 
       {/* Payment Modal for Kiosk */}
       {showPaymentModal && (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-[40px] p-8 max-w-sm w-full shadow-2xl my-auto animate-in zoom-in duration-300">
-              <div className="text-center mb-8">
-                <h2 className="text-xl font-black text-slate-800">Renew Membership</h2>
-                <p className="text-indigo-600 font-bold">for {member.fullName}</p>
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-3 z-50">
+          <div className="bg-white rounded-[32px] p-5 max-w-sm w-full shadow-2xl my-auto animate-in zoom-in duration-300 max-h-[90vh] overflow-y-auto">
+              <div className="text-center mb-4">
+                <h2 className="text-lg font-black text-slate-800">Renew Membership</h2>
+                <p className="text-indigo-600 font-bold text-sm">for {member.fullName}</p>
               </div>
 
               {paymentStep === 'qr' && (
                 <>
-                  <div className="grid grid-cols-2 gap-3 mb-6">
+                  <div className="grid grid-cols-2 gap-2 mb-4">
                     {(() => {
                       const cat = settings?.pricing?.find(c => c.category === member.memberCategory);
                       if (!cat) return null;
@@ -416,13 +417,13 @@ const MemberKiosk = () => {
                         <button 
                           key={pkg.name}
                           onClick={() => setSelectedPlan(pkg)}
-                          className={`relative p-3 rounded-[20px] border-[3px] transition-all duration-200 flex flex-col items-center justify-center ${
+                          className={`relative p-2.5 rounded-[16px] border-[3px] transition-all duration-200 flex flex-col items-center justify-center ${
                             selectedPlan?.name === pkg.name 
                               ? 'border-indigo-600 bg-white shadow-lg' 
                               : 'border-slate-100 bg-white hover:border-slate-200'
                           }`}
                         >
-                          <span className="text-xl font-black text-slate-800 leading-none">{pkg.name}</span>
+                          <span className="text-base font-black text-slate-800 leading-none text-center">{pkg.name}</span>
                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
                             ₹{pkg.price}
                           </span>
@@ -431,35 +432,35 @@ const MemberKiosk = () => {
                     })()}
                   </div>
 
-                  <div className="bg-slate-50 p-6 rounded-[32px] mb-8 flex flex-col items-center border border-slate-100">
-                    <div className="bg-white p-4 rounded-[24px] shadow-2xl shadow-slate-200 mb-6">
+                  <div className="bg-slate-50 p-4 rounded-[24px] mb-4 flex flex-col items-center border border-slate-100">
+                    <div className="bg-white p-3 rounded-[20px] shadow-xl shadow-slate-200 mb-3">
                         <QRCodeCanvas
                           value={`upi://pay?pa=${settings?.upiId || UPI_ID}&pn=${encodeURIComponent(PAYEE_NAME)}&am=${selectedPlan?.price}&cu=INR`}
-                          size={160}
+                          size={140}
                           level="H"
                           includeMargin={false}
                         />
                     </div>
                     
                     <div className="text-center">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Total Amount</p>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Total Amount</p>
                       <div className="flex items-center justify-center leading-none">
-                        <span className="text-2xl font-black text-slate-600 self-start mt-1 mr-1">₹</span>
-                        <span className="text-5xl font-black text-slate-900 tracking-tighter">{selectedPlan?.price}</span>
+                        <span className="text-xl font-black text-slate-600 self-start mt-0.5 mr-0.5">₹</span>
+                        <span className="text-4xl font-black text-slate-900 tracking-tighter">{selectedPlan?.price}</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3">
+                  <div className="grid grid-cols-1 gap-2">
                      <button 
                       onClick={() => setPaymentStep('transactionInput')} 
-                      className="w-full p-5 rounded-2xl bg-indigo-600 text-white font-black text-xl shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition active:scale-95"
+                      className="w-full p-4 rounded-2xl bg-indigo-600 text-white font-black text-lg shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition active:scale-95"
                     >
                       I HAVE PAID
                     </button>
                     <button 
                       onClick={() => { setShowPaymentModal(false); setPaymentStep('qr'); }} 
-                      className="w-full p-4 rounded-2xl font-bold text-slate-400 hover:text-slate-600 transition text-sm"
+                      className="w-full p-3 rounded-2xl font-bold text-slate-400 hover:text-slate-600 transition text-sm"
                     >
                       Cancel
                     </button>
@@ -469,37 +470,37 @@ const MemberKiosk = () => {
 
               {paymentStep === 'transactionInput' && (
                 <div className="animate-in slide-in-from-right duration-300">
-                  <div className="bg-indigo-50 p-6 rounded-[32px] mb-8 text-center border border-indigo-100">
-                    <div className="w-16 h-16 bg-white text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-md">
-                        <CheckCircle2 size={32} />
+                  <div className="bg-indigo-50 p-4 rounded-[24px] mb-4 text-center border border-indigo-100">
+                    <div className="w-12 h-12 bg-white text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-md">
+                        <CheckCircle2 size={28} />
                     </div>
-                    <h3 className="text-lg font-black text-slate-800 mb-2">Payment Marked Done</h3>
+                    <h3 className="text-base font-black text-slate-800 mb-1">Payment Marked Done</h3>
                     <p className="text-xs font-bold text-slate-500">Please provide the transaction ID to confirm your payment of ₹{selectedPlan?.price}.</p>
                   </div>
                   
-                  <div className="mb-6">
-                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-2">Enter Transaction ID</label>
+                  <div className="mb-4">
+                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Enter Transaction ID</label>
                     <input 
                       type="text" 
                       placeholder="e.g. T234567890"
                       value={transactionId}
                       onChange={(e) => setTransactionId(e.target.value)}
-                      className="w-full p-5 rounded-2xl border-2 border-slate-100 bg-slate-50 text-slate-800 font-bold focus:border-indigo-500 focus:bg-white outline-none transition"
+                      className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50 text-slate-800 font-bold focus:border-indigo-500 focus:bg-white outline-none transition"
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3">
+                  <div className="grid grid-cols-1 gap-2">
                      <button 
                       onClick={submitPaymentRequest} 
                       disabled={loading}
-                      className="w-full p-5 rounded-2xl bg-emerald-500 text-white font-black text-xl shadow-xl shadow-emerald-200 hover:bg-emerald-600 transition active:scale-95 disabled:opacity-50"
+                      className="w-full p-4 rounded-2xl bg-emerald-500 text-white font-black text-lg shadow-xl shadow-emerald-200 hover:bg-emerald-600 transition active:scale-95 disabled:opacity-50"
                     >
                       {loading ? 'Submitting...' : 'Done'}
                     </button>
                     <button 
                       onClick={() => { setPaymentStep('qr'); setTransactionId(''); }} 
                       disabled={loading}
-                      className="w-full p-4 rounded-2xl font-bold text-slate-400 hover:text-slate-600 transition text-sm"
+                      className="w-full p-3 rounded-2xl font-bold text-slate-400 hover:text-slate-600 transition text-sm"
                     >
                       Back to QR
                     </button>

@@ -136,11 +136,11 @@ const OwnerDashboard = () => {
                   expMidnight.setHours(0,0,0,0);
                   const diffDays = Math.ceil((expMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24));
                   
-                  let message = `Hello ${m.fullName},\n\nThis is a gentle reminder from GymPro V2 that your membership is expiring on ${dateStr} (in ${diffDays} days).\n\nPlease renew your membership on time to continue your fitness journey!\n\nThank you!`;
+                  let message = `Hello ${m.fullName},\n\nThis is a gentle reminder from Fitness Fanatic that your membership is expiring on ${dateStr} (in ${diffDays} days).\n\nPlease renew your membership on time to continue your fitness journey!\n\nThank you!`;
                   if (diffDays <= 0) {
-                    message = `Hello ${m.fullName},\n\nThis is a gentle reminder from GymPro V2 that your membership expires TODAY (${dateStr}).\n\nPlease renew your membership on time to continue your fitness journey!\n\nThank you!`;
+                    message = `Hello ${m.fullName},\n\nThis is a gentle reminder from Fitness Fanatic that your membership expires TODAY (${dateStr}).\n\nPlease renew your membership on time to continue your fitness journey!\n\nThank you!`;
                   } else if (diffDays === 1) {
-                    message = `Hello ${m.fullName},\n\nThis is a gentle reminder from GymPro V2 that your membership is expiring TOMORROW (${dateStr}).\n\nPlease renew your membership on time to continue your fitness journey!\n\nThank you!`;
+                    message = `Hello ${m.fullName},\n\nThis is a gentle reminder from Fitness Fanatic that your membership is expiring TOMORROW (${dateStr}).\n\nPlease renew your membership on time to continue your fitness journey!\n\nThank you!`;
                   }
                   
                   const rawPhone = m.whatsapp || m.phone;

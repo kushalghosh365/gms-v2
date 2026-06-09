@@ -12,9 +12,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
-        name: 'GymPro Member Kiosk',
-        short_name: 'GymKiosk',
-        description: 'Automated Gym Membership & Attendance Kiosk',
+        name: 'Fitness Fanatic',
+        short_name: 'FitFanatic',
+        description: 'Fitness Fanatic Gym - Member Kiosk & Management',
         theme_color: '#4f46e5',
         icons: [
           {

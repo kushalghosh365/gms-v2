@@ -27,6 +27,39 @@ const uploadToCloudinary = (buffer, folder = 'gms-members') => {
     });
 };
 
+// --- IST Timezone Helpers ---
+// Returns IST { hour, minute }
+const getISTTime = () => {
+    const now = new Date();
+    const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const istDate = new Date(utcMs + (5.5 * 60 * 60 * 1000));
+    return { hour: istDate.getUTCHours(), minute: istDate.getUTCMinutes() };
+};
+
+// Returns IST time as "HH:MM:SS AM/PM"
+const getISTTimeString = () => {
+    const now = new Date();
+    const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const istDate = new Date(utcMs + (5.5 * 60 * 60 * 1000));
+    let hours = istDate.getUTCHours();
+    const minutes = String(istDate.getUTCMinutes()).padStart(2, '0');
+    const seconds = String(istDate.getUTCSeconds()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12;
+    return `${String(hours).padStart(2, '0')}:${minutes}:${seconds} ${ampm}`;
+};
+
+// Returns IST date as "YYYY-MM-DD"
+const getISTDateString = () => {
+    const now = new Date();
+    const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const istDate = new Date(utcMs + (5.5 * 60 * 60 * 1000));
+    const year = istDate.getUTCFullYear();
+    const month = String(istDate.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(istDate.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
 // MySQL Config and Models
 const sequelize = require('./config/database');
 const Member = require('./models/Member');
@@ -96,7 +129,7 @@ sequelize.authenticate()
 // --- CRON JOBS & TASKS ---
 const cleanupStaleAttendance = async () => {
     try {
-        const today = new Date().toISOString().split('T')[0];
+        const today = getISTDateString();
 
         // Checkout Staff from previous days
         const staffs = await Staff.findAll();
@@ -150,7 +183,7 @@ cron.schedule('59 23 * * *', async () => {
 
     // Also checkout today's remaining INs just in case
     try {
-        const today = new Date().toISOString().split('T')[0];
+        const today = getISTDateString();
 
         const staffs = await Staff.findAll();
         for (let staff of staffs) {
@@ -371,7 +404,67 @@ app.post('/api/members/register', upload.single('photo'), async (req, res) => {
 
         const existingMember = await Member.findOne({ where: { phone } });
         if (existingMember) {
-            return res.status(400).json({ error: 'Member with this phone number already exists' });
+            if (existingMember.isDeleted) {
+                let durationDays = 30; // default
+                let settings = await Settings.findOne();
+                if (settings) {
+                    const categoryConfig = settings.pricing.find(c => c.category === (memberCategory || 'General'));
+                    if (categoryConfig) {
+                        const pack = categoryConfig.packages.find(p => p.name === (packageType || '1 Month'));
+                        if (pack) durationDays = pack.durationDays;
+                    }
+                }
+
+                let expiryDate = new Date();
+                expiryDate.setDate(expiryDate.getDate() + durationDays);
+
+                existingMember.fullName = fullName;
+                existingMember.email = email;
+                existingMember.whatsapp = whatsapp;
+                if (photoPath) existingMember.photo = photoPath;
+                existingMember.memberCategory = memberCategory || 'General';
+                existingMember.packageType = packageType || '1 Month';
+                existingMember.membershipStatus = 'Valid';
+                existingMember.expiryDate = expiryDate;
+                existingMember.gender = gender || 'Male';
+                existingMember.isDeleted = false; // Reactivate!
+                await existingMember.save();
+
+                const admissionAmt = Number(admissionFeePaid || 0);
+                const packageAmt = Number(packageFeePaid || 0);
+
+                if (admissionAmt > 0) {
+                    await Payment.create({
+                        memberId: existingMember.id,
+                        amount: admissionAmt,
+                        type: 'Admission',
+                        method: 'Manual',
+                        packageType: 'Admission Fee',
+                        durationDays: 0
+                    });
+                }
+
+                if (packageAmt > 0) {
+                    await Payment.create({
+                        memberId: existingMember.id,
+                        amount: packageAmt,
+                        type: 'Renewal',
+                        method: 'Manual',
+                        packageType: packageType || '1 Month',
+                        durationDays
+                    });
+                }
+
+                const qrCodeData = await QRCode.toDataURL(phone);
+
+                return res.status(201).json({
+                    message: 'Registration successful',
+                    member: mapRecord(existingMember),
+                    qrCode: qrCodeData
+                });
+            } else {
+                return res.status(400).json({ error: 'Member with this phone number already exists' });
+            }
         }
 
         let durationDays = 30; // default
@@ -454,7 +547,24 @@ app.post('/api/staff/register', upload.single('photo'), async (req, res) => {
         }
 
         const existingStaff = await Staff.findOne({ where: { phone } });
-        if (existingStaff) return res.status(400).json({ error: 'Staff with this phone number already exists' });
+        if (existingStaff) {
+            if (existingStaff.isDeleted) {
+                existingStaff.fullName = fullName;
+                existingStaff.email = email;
+                existingStaff.whatsapp = whatsapp;
+                if (photo) existingStaff.photo = photo;
+                existingStaff.role = role;
+                existingStaff.joiningDate = joiningDate;
+                existingStaff.gender = gender || 'Male';
+                existingStaff.isDeleted = false; // Reactivate!
+                await existingStaff.save();
+
+                const qrCodeData = await QRCode.toDataURL(phone);
+                return res.status(201).json({ message: 'Staff Registration successful', staff: mapRecord(existingStaff), qrCode: qrCodeData });
+            } else {
+                return res.status(400).json({ error: 'Staff with this phone number already exists' });
+            }
+        }
 
         const newStaff = await Staff.create({ fullName, email, phone, whatsapp, photo, role, joiningDate, gender: gender || 'Male' });
         const qrCodeData = await QRCode.toDataURL(phone);
@@ -482,7 +592,7 @@ app.post('/api/admin/staff-attendance', async (req, res) => {
         const staff = await Staff.findOne({ where: { phone } });
         if (!staff) return res.status(404).json({ message: 'Staff not found' });
 
-        const targetDate = date || new Date().toISOString().split('T')[0];
+        const targetDate = date || getISTDateString();
         let attendance = Array.isArray(staff.attendance) ? [...staff.attendance] : [];
         let attendanceRecord = attendance.find(a => a.date === targetDate);
 
@@ -576,6 +686,30 @@ app.get('/api/kiosk/profile/:phone', async (req, res) => {
     }
 });
 
+// Helpers for Staff Kiosk Time Constraints
+const validateStaffCheckInTime = () => {
+    const { hour, minute } = getISTTime();
+    
+    // Morning shift cutoff: 6:10 AM (06:10)
+    if (hour < 12) {
+        if (hour > 6 || (hour === 6 && minute > 10)) {
+            return {
+                allowed: false,
+                message: "Morning check-in is not allowed after 06:10 AM."
+            };
+        }
+    } else {
+        // Afternoon shift cutoff: 4:10 PM (16:10)
+        if (hour > 16 || (hour === 16 && minute > 10)) {
+            return {
+                allowed: false,
+                message: "Afternoon check-in is not allowed after 04:10 PM."
+            };
+        }
+    }
+    return { allowed: true };
+};
+
 // 4. Kiosk: Check In/Out (using Mobile Number)
 app.post('/api/kiosk/attendance', async (req, res) => {
     try {
@@ -584,7 +718,7 @@ app.post('/api/kiosk/attendance', async (req, res) => {
         // Member Logic
         let member = await Member.findOne({ where: { phone } });
         if (member) {
-            const today = new Date().toISOString().split('T')[0];
+            const today = getISTDateString();
             let attendance = Array.isArray(member.attendance) ? [...member.attendance] : [];
             let attendanceRecord = attendance.find(a => a.date === today);
 
@@ -594,12 +728,12 @@ app.post('/api/kiosk/attendance', async (req, res) => {
                     if (attendanceRecord.status === 'IN') return res.status(400).json({ message: 'Already Checked IN' });
                     if (attendanceRecord.status === 'OUT') return res.status(400).json({ message: 'Your attendance limit 1 time in a single day' });
                 } else {
-                    attendance.push({ date: today, inTime: new Date().toLocaleTimeString(), status: 'IN' });
+                    attendance.push({ date: today, inTime: getISTTimeString(), status: 'IN' });
                 }
             } else if (action === 'OUT') {
                 if (!attendanceRecord || attendanceRecord.status === 'OUT') return res.status(400).json({ message: "You are not IN, so you can't OUT" });
                 attendanceRecord.status = 'OUT';
-                attendanceRecord.outTime = new Date().toLocaleTimeString();
+                attendanceRecord.outTime = getISTTimeString();
             }
 
             member.attendance = attendance;
@@ -611,21 +745,27 @@ app.post('/api/kiosk/attendance', async (req, res) => {
         // Staff Logic
         let staff = await Staff.findOne({ where: { phone } });
         if (staff) {
-            const today = new Date().toISOString().split('T')[0];
+            const today = getISTDateString();
             let attendance = Array.isArray(staff.attendance) ? [...staff.attendance] : [];
             let attendanceRecord = attendance.find(a => a.date === today);
 
             if (action === 'IN') {
+                // Time validation for staff check-in
+                const timeCheck = validateStaffCheckInTime();
+                if (!timeCheck.allowed) {
+                    return res.status(403).json({ message: timeCheck.message });
+                }
+
                 if (attendanceRecord) {
                     if (attendanceRecord.status === 'IN') return res.status(400).json({ message: 'Already Checked IN' });
                     if (attendanceRecord.dayType === 'FULL_DAY' || attendanceRecord.dayType === 'HALF_WORK_HALF_LEAVE') return res.status(400).json({ message: 'Your attendance limit 2time in a single day' });
                     if (attendanceRecord.dayType === 'FULL_LEAVE') return res.status(400).json({ message: 'Staff is marked on LEAVE today' });
 
                     attendanceRecord.status = 'IN';
-                    attendanceRecord.inTime = new Date().toLocaleTimeString();
+                    attendanceRecord.inTime = getISTTimeString();
                     attendanceRecord.inTimeTimestamp = Date.now();
                 } else {
-                    attendance.push({ date: today, inTime: new Date().toLocaleTimeString(), status: 'IN', dayType: 'PENDING', inTimeTimestamp: Date.now() });
+                    attendance.push({ date: today, inTime: getISTTimeString(), status: 'IN', dayType: 'PENDING', inTimeTimestamp: Date.now() });
                 }
             } else if (action === 'OUT') {
                 if (!attendanceRecord || attendanceRecord.status === 'OUT') return res.status(400).json({ message: "You are not IN, so you can't OUT" });
@@ -635,16 +775,16 @@ app.post('/api/kiosk/attendance', async (req, res) => {
                     sessionMs = Date.now() - attendanceRecord.inTimeTimestamp;
                 }
 
-                const fourHoursMs = 4 * 60 * 60 * 1000;
-                if (sessionMs < fourHoursMs) {
-                    return res.status(403).json({ message: "You must complete at least 4 hours to checkout." });
+                const minSessionMs = 4.5 * 60 * 60 * 1000; // 4 hours 30 minutes
+                if (sessionMs < minSessionMs) {
+                    return res.status(403).json({ message: "You must complete at least 4 hours 30 minutes to checkout." });
                 }
 
                 attendanceRecord.totalWorkingMs = (attendanceRecord.totalWorkingMs || 0) + sessionMs;
                 attendanceRecord.inTimeTimestamp = null;
 
                 attendanceRecord.status = 'OUT';
-                attendanceRecord.outTime = new Date().toLocaleTimeString();
+                attendanceRecord.outTime = getISTTimeString();
 
                 if (attendanceRecord.dayType === 'PENDING') {
                     attendanceRecord.dayType = 'HALF_DAY';
@@ -848,7 +988,7 @@ app.post('/api/admin/manual-attendance', async (req, res) => {
         const member = await Member.findOne({ where: { phone } });
         if (!member) return res.status(404).json({ message: 'Member not found' });
 
-        const targetDate = date || new Date().toISOString().split('T')[0];
+        const targetDate = date || getISTDateString();
         let attendance = Array.isArray(member.attendance) ? [...member.attendance] : [];
         let attendanceRecord = attendance.find(a => a.date === targetDate);
 
@@ -1000,7 +1140,45 @@ app.post('/api/members/register-old', upload.single('photo'), async (req, res) =
 
         const existingMember = await Member.findOne({ where: { phone } });
         if (existingMember) {
-            return res.status(400).json({ error: 'Member with this phone number already exists' });
+            if (existingMember.isDeleted) {
+                let durationDays = 30;
+                let settings = await Settings.findOne();
+                if (settings) {
+                    const categoryConfig = settings.pricing.find(c => c.category === (memberCategory || 'General'));
+                    if (categoryConfig) {
+                        const pack = categoryConfig.packages.find(p => p.name === (packageType || '1 Month'));
+                        if (pack) durationDays = pack.durationDays;
+                    }
+                }
+
+                const joinDate = joiningDate ? new Date(joiningDate) : new Date();
+                let expiryDate = new Date(joinDate);
+                expiryDate.setDate(expiryDate.getDate() + durationDays);
+
+                const membershipStatus = expiryDate > new Date() ? 'Valid' : 'Expired';
+
+                existingMember.fullName = fullName;
+                existingMember.email = email;
+                existingMember.whatsapp = whatsapp;
+                if (photoPath) existingMember.photo = photoPath;
+                existingMember.memberCategory = memberCategory || 'General';
+                existingMember.packageType = packageType || '1 Month';
+                existingMember.membershipStatus = membershipStatus;
+                existingMember.expiryDate = expiryDate;
+                existingMember.registrationDate = joinDate;
+                existingMember.gender = gender || 'Male';
+                existingMember.isDeleted = false; // Reactivate!
+                await existingMember.save();
+
+                const qrCodeData = await QRCode.toDataURL(phone);
+                return res.status(201).json({
+                    message: 'Old Member Registration successful',
+                    member: mapRecord(existingMember),
+                    qrCode: qrCodeData
+                });
+            } else {
+                return res.status(400).json({ error: 'Member with this phone number already exists' });
+            }
         }
 
         // Calculate expiry from joining date + package duration
@@ -1083,7 +1261,64 @@ app.delete('/api/staff/:id', async (req, res) => {
     }
 });
 
-const PORT = process.env.PORT || 5000;
+
+//============================================
+//member & staff edit options
+//============================================
+/*
+edit options
+if photo is being updated, send it as multipart form data with key 'photo'
+other fields can be sent in JSON body as usual
+name, email, whatsapp, memberCategory, packageType, joiningDate,gender can be updated for members
+name, email, whatsapp, role, joiningDate,gender can be updated for staff
+*/
+
+// Edit Member
+
+app.put('/api/members/:id', upload.single('photo'), async (req, res) => {
+    try {
+        const member = await Member.findByPk(req.params.id);
+        if (!member) return res.status(404).json({ message: 'Member not found' });
+
+        const { fullName, email, whatsapp, memberCategory, packageType, joiningDate, gender } = req.body;
+        if (fullName) member.fullName = fullName;
+        if (email) member.email = email;
+        if (whatsapp) member.whatsapp = whatsapp;
+        if (memberCategory) member.memberCategory = memberCategory;
+        if (packageType) member.packageType = packageType;
+        if (joiningDate) member.joiningDate = joiningDate;
+        if (gender) member.gender = gender;
+
+        await member.save();
+        res.json({ message: 'Member updated successfully', member });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Edit Staff
+
+app.put('/api/staff/:id', upload.single('photo'), async (req, res) => {
+    try {
+        const staff = await Staff.findByPk(req.params.id);
+        if (!staff) return res.status(404).json({ message: 'Staff not found' });
+
+        const { fullName, email, whatsapp, role, joiningDate, gender } = req.body;
+        if (fullName) staff.fullName = fullName;
+        if (email) staff.email = email;
+        if (whatsapp) staff.whatsapp = whatsapp;
+        if (role) staff.role = role;
+        if (joiningDate) staff.joiningDate = joiningDate;
+        if (gender) staff.gender = gender;
+
+        await staff.save();
+        res.json({ message: 'Staff updated successfully', staff });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+
 
 // Helper function to run robust fail-safe migrations for TiDB
 async function runFailSafeMigrations() {
@@ -1097,6 +1332,10 @@ async function runFailSafeMigrations() {
     try {
         await sequelize.query("ALTER TABLE `members` ADD COLUMN `gender` VARCHAR(255) DEFAULT 'Male';");
         console.log("Migration SUCCESS: Added 'gender' to 'members'.");
+    } catch (e) {}
+    try {
+        await sequelize.query("ALTER TABLE `members` MODIFY COLUMN `memberCategory` VARCHAR(255) DEFAULT 'General';");
+        console.log("Migration SUCCESS: Altered 'memberCategory' column to VARCHAR(255) in 'members'.");
     } catch (e) {}
 
     try {
