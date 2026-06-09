@@ -25,6 +25,18 @@ const MemberList = () => {
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
 
+  // Edit modal state
+  const [editModal, setEditModal] = useState({ show: false, member: null });
+  const [editForm, setEditForm] = useState({
+    fullName: '',
+    email: '',
+    whatsapp: '',
+    gender: 'Male',
+    memberCategory: 'General',
+    packageType: ''
+  });
+  const [editLoading, setEditLoading] = useState(false);
+
 
 
   const downloadQRCard = () => {
@@ -130,9 +142,57 @@ const MemberList = () => {
   };
 
   const handleEditMember = (member) => {
-    // This function can be expanded to open an edit modal with member details pre-filled
-    alert(`Edit functionality for ${member.fullName} is not implemented yet.`);
-  }
+    setEditForm({
+      fullName: member.fullName || '',
+      email: member.email || '',
+      whatsapp: member.whatsapp || '',
+      gender: member.gender || 'Male',
+      memberCategory: member.memberCategory || 'General',
+      packageType: member.packageType || ''
+    });
+    setEditModal({ show: true, member });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editForm.fullName.trim()) {
+      alert('Please enter member name');
+      return;
+    }
+
+    setEditLoading(true);
+    try {
+      await axios.put(`/api/members/${editModal.member._id}`, {
+        fullName: editForm.fullName,
+        email: editForm.email,
+        whatsapp: editForm.whatsapp,
+        gender: editForm.gender,
+        memberCategory: editForm.memberCategory,
+        packageType: editForm.packageType
+      });
+      
+      setEditModal({ show: false, member: null });
+      setEditForm({
+        fullName: '',
+        email: '',
+        whatsapp: '',
+        gender: 'Male',
+        memberCategory: 'General',
+        packageType: ''
+      });
+      
+      // Show success message
+      setStatusMessage(prev => ({ ...prev, [editModal.member._id]: 'Member Updated!' }));
+      setTimeout(() => {
+        setStatusMessage(prev => { const { [editModal.member._id]: _, ...rest } = prev; return rest; });
+      }, 3000);
+      
+      fetchMembers();
+    } catch (err) {
+      alert('Error: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setEditLoading(false);
+    }
+  };
 
 
 
@@ -189,6 +249,15 @@ const MemberList = () => {
               title="Delete Member"
             >
               <Trash2 size={13} />
+            </button>
+
+            {/* Edit Button — top left, next to delete */}
+            <button
+              onClick={() => handleEditMember(m)}
+              className="absolute top-3 left-14 p-1.5 bg-blue-50 text-blue-400 rounded-lg hover:bg-blue-100 hover:text-blue-600 transition opacity-0 group-hover:opacity-100 z-10"
+              title="Edit Member"
+            >
+              <User size={13} />
             </button>
 
             {statusMessage[m._id] && (
@@ -468,14 +537,139 @@ const MemberList = () => {
         </div>
       )}
 
-      {/* Future Edit Modal can be added here, similar to the above modals with a form to edit member details */ }
-      {editModal && (
+      {/* Edit Modal */}
+      {editModal.show && editModal.member && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl animate-in fade-in zoom-in duration-300">
-            {/* Edit form content goes here */}
-            <button onClick={() => setEditModal(null)} className="absolute top-4 right-4 p-2 bg-slate-100 rounded-full hover:bg-slate-200"><X size={20} /></button>
-            <h2 className="text-xl font-bold mb-6 text-center">Edit Member Details</h2>
-            {/* Form fields for editing member details would go here */}
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl animate-in fade-in zoom-in duration-300 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-slate-900">Edit Member Details</h2>
+              <button 
+                onClick={() => { setEditModal({ show: false, member: null }); }}
+                className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Full Name */}
+              <div>
+                <label className="text-xs font-bold text-slate-600 uppercase tracking-widest">Full Name *</label>
+                <input
+                  type="text"
+                  value={editForm.fullName}
+                  onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
+                  placeholder="Enter full name"
+                  className="w-full mt-1 p-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 outline-none font-semibold"
+                />
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className="text-xs font-bold text-slate-600 uppercase tracking-widest">Email Address</label>
+                <input
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                  placeholder="Enter email address"
+                  className="w-full mt-1 p-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 outline-none font-semibold"
+                />
+              </div>
+
+              {/* WhatsApp */}
+              <div>
+                <label className="text-xs font-bold text-slate-600 uppercase tracking-widest">WhatsApp Number</label>
+                <input
+                  type="tel"
+                  value={editForm.whatsapp}
+                  onChange={(e) => setEditForm({ ...editForm, whatsapp: e.target.value })}
+                  placeholder="Enter WhatsApp number"
+                  className="w-full mt-1 p-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 outline-none font-semibold"
+                />
+              </div>
+
+              {/* Gender */}
+              <div>
+                <label className="text-xs font-bold text-slate-600 uppercase tracking-widest">Gender</label>
+                <select
+                  value={editForm.gender}
+                  onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
+                  className="w-full mt-1 p-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 outline-none font-semibold"
+                >
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              {/* Member Category */}
+              <div>
+                <label className="text-xs font-bold text-slate-600 uppercase tracking-widest">Member Category</label>
+                <select
+                  value={editForm.memberCategory}
+                  onChange={(e) => setEditForm({ ...editForm, memberCategory: e.target.value })}
+                  className="w-full mt-1 p-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 outline-none font-semibold"
+                >
+                  {settings?.pricing?.map(cat => (
+                    <option key={cat.category} value={cat.category}>
+                      {cat.category}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Package Type */}
+              <div>
+                <label className="text-xs font-bold text-slate-600 uppercase tracking-widest">Package Type</label>
+                <select
+                  value={editForm.packageType}
+                  onChange={(e) => setEditForm({ ...editForm, packageType: e.target.value })}
+                  className="w-full mt-1 p-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 outline-none font-semibold"
+                >
+                  <option value="">Select a package</option>
+                  {getPackagesForMember(editForm.memberCategory).map(pkg => (
+                    <option key={pkg.name} value={pkg.name}>
+                      {pkg.name} - ₹{pkg.price}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Member ID (Read-only) */}
+              <div>
+                <label className="text-xs font-bold text-slate-600 uppercase tracking-widest">Phone Number (ID - Read-only)</label>
+                <input
+                  type="text"
+                  value={editModal.member?.phone || ''}
+                  disabled
+                  className="w-full mt-1 p-3 rounded-xl border-2 border-slate-200 bg-slate-50 font-semibold text-slate-500"
+                />
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => { setEditModal({ show: false, member: null }); }}
+                className="flex-1 p-3 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                disabled={editLoading}
+                className="flex-1 p-3 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {editLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Saving...
+                  </>
+                ) : (
+                  'Save Changes'
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
