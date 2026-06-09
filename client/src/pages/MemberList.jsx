@@ -467,6 +467,18 @@ const MemberList = () => {
           </div>
         </div>
       )}
+
+      {/* Future Edit Modal can be added here, similar to the above modals with a form to edit member details */ }
+      {editModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl animate-in fade-in zoom-in duration-300">
+            {/* Edit form content goes here */}
+            <button onClick={() => setEditModal(null)} className="absolute top-4 right-4 p-2 bg-slate-100 rounded-full hover:bg-slate-200"><X size={20} /></button>
+            <h2 className="text-xl font-bold mb-6 text-center">Edit Member Details</h2>
+            {/* Form fields for editing member details would go here */}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
