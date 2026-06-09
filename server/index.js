@@ -1261,7 +1261,7 @@ app.delete('/api/staff/:id', async (req, res) => {
     }
 });
 
-
+const PORT = process.env.PORT || 5000;
 //============================================
 //member & staff edit options
 //============================================
