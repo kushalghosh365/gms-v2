@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
-import { Search, Phone, Calendar, CheckCircle, XCircle, LogIn, LogOut, DollarSign, X, Download, Monitor, User, Trash2, Send } from 'lucide-react';
+import { Search, Phone, Calendar, CheckCircle, XCircle, LogIn, LogOut, DollarSign, X, Download, Monitor, User, Trash2, Send, Pencil, Save, ChevronDown } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import html2canvas from 'html2canvas';
 
@@ -18,24 +18,15 @@ const MemberList = () => {
 
   const [qrModal, setQrModal] = useState({ show: false, member: null });
   const [detailsModal, setDetailsModal] = useState({ show: false, member: null });
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editForm, setEditForm] = useState({});
+  const [editLoading, setEditLoading] = useState(false);
   const cardRef = useRef(null);
 
   // Delete modal state
   const [deleteModal, setDeleteModal] = useState({ show: false, member: null });
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
-
-  // Edit modal state
-  const [editModal, setEditModal] = useState({ show: false, member: null });
-  const [editForm, setEditForm] = useState({
-    fullName: '',
-    email: '',
-    whatsapp: '',
-    gender: 'Male',
-    memberCategory: 'General',
-    packageType: ''
-  });
-  const [editLoading, setEditLoading] = useState(false);
 
 
 
@@ -141,51 +132,64 @@ const MemberList = () => {
     }
   };
 
-  const handleEditMember = (member) => {
-    setEditForm({
-      fullName: member.fullName || '',
-      email: member.email || '',
-      whatsapp: member.whatsapp || '',
-      gender: member.gender || 'Male',
-      memberCategory: member.memberCategory || 'General',
-      packageType: member.packageType || ''
-    });
-    setEditModal({ show: true, member });
+
+  const openDetails = (member) => {
+    setDetailsModal({ show: true, member });
+    setIsEditMode(false);
+    setEditForm({});
   };
 
-  const handleSaveEdit = async () => {
-    if (!editForm.fullName.trim()) {
-      alert('Please enter member name');
-      return;
-    }
+  const startEdit = (member) => {
+    setIsEditMode(true);
+    setEditForm({
+      fullName: member.fullName || '',
+      gender: member.gender || 'Male',
+      phone: member.phone || '',
+      whatsapp: member.whatsapp || '',
+      memberCategory: member.memberCategory || 'General',
+      packageType: member.packageType || '',
+      registrationDate: member.registrationDate
+        ? new Date(member.registrationDate).toISOString().split('T')[0]
+        : new Date(member.createdAt).toISOString().split('T')[0],
+    });
+  };
 
+  const calcPreviewExpiry = () => {
+    if (!settings || !editForm.registrationDate || !editForm.packageType) return null;
+    const cat = settings.pricing?.find(c => c.category === (editForm.memberCategory || 'General'));
+    if (!cat) return null;
+    const pkg = cat.packages?.find(p => p.name === editForm.packageType);
+    if (!pkg) return null;
+    const base = new Date(editForm.registrationDate);
+    base.setDate(base.getDate() + pkg.durationDays);
+    return base.toLocaleDateString('en-GB');
+  };
+
+  const handleEditMember = async () => {
     setEditLoading(true);
     try {
-      await axios.put(`/api/members/${editModal.member._id}`, {
-        fullName: editForm.fullName,
-        email: editForm.email,
-        whatsapp: editForm.whatsapp,
-        gender: editForm.gender,
-        memberCategory: editForm.memberCategory,
-        packageType: editForm.packageType
-      });
-      
-      setEditModal({ show: false, member: null });
-      setEditForm({
-        fullName: '',
-        email: '',
-        whatsapp: '',
-        gender: 'Male',
-        memberCategory: 'General',
-        packageType: ''
-      });
-      
-      // Show success message
-      setStatusMessage(prev => ({ ...prev, [editModal.member._id]: 'Member Updated!' }));
-      setTimeout(() => {
-        setStatusMessage(prev => { const { [editModal.member._id]: _, ...rest } = prev; return rest; });
-      }, 3000);
-      
+      const original = detailsModal.member;
+      const payload = {};
+      if (editForm.fullName !== original.fullName) payload.fullName = editForm.fullName;
+      if (editForm.gender !== (original.gender || 'Male')) payload.gender = editForm.gender;
+      if (editForm.whatsapp !== (original.whatsapp || '')) payload.whatsapp = editForm.whatsapp;
+      if (editForm.memberCategory !== (original.memberCategory || 'General')) payload.memberCategory = editForm.memberCategory;
+      if (editForm.packageType !== (original.packageType || '')) payload.packageType = editForm.packageType;
+      const origRegDate = original.registrationDate
+        ? new Date(original.registrationDate).toISOString().split('T')[0]
+        : new Date(original.createdAt).toISOString().split('T')[0];
+      if (editForm.registrationDate !== origRegDate) payload.registrationDate = editForm.registrationDate;
+
+      if (Object.keys(payload).length === 0) {
+        setIsEditMode(false);
+        setEditLoading(false);
+        return;
+      }
+
+      const res = await axios.put(`/api/members/${original._id}`, payload);
+      const updatedMember = res.data.member;
+      setDetailsModal({ show: true, member: updatedMember });
+      setIsEditMode(false);
       fetchMembers();
     } catch (err) {
       alert('Error: ' + (err.response?.data?.message || err.message));
@@ -193,9 +197,6 @@ const MemberList = () => {
       setEditLoading(false);
     }
   };
-
-
-
 
   const filteredMembers = members.filter(m => {
     const matchesSearch = m.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || m.phone.includes(searchTerm);
@@ -251,15 +252,6 @@ const MemberList = () => {
               <Trash2 size={13} />
             </button>
 
-            {/* Edit Button — top left, next to delete */}
-            <button
-              onClick={() => handleEditMember(m)}
-              className="absolute top-3 left-14 p-1.5 bg-blue-50 text-blue-400 rounded-lg hover:bg-blue-100 hover:text-blue-600 transition opacity-0 group-hover:opacity-100 z-10"
-              title="Edit Member"
-            >
-              <User size={13} />
-            </button>
-
             {statusMessage[m._id] && (
               <div className="absolute inset-0 bg-slate-900/10 backdrop-blur-[2px] flex items-center justify-center z-10 animate-in fade-in duration-300">
                 <div className="bg-white px-4 py-2 rounded-2xl shadow-xl border border-slate-100 animate-in zoom-in slide-in-from-bottom-2 duration-300">
@@ -286,7 +278,7 @@ const MemberList = () => {
                 <h3 className="font-black text-xl text-slate-900 leading-tight flex items-center flex-wrap gap-2">
                   {m.fullName}
                   <button
-                    onClick={() => setDetailsModal({ show: true, member: m })}
+                    onClick={() => openDetails(m)}
                     className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-full hover:bg-indigo-100 hover:text-indigo-600 transition flex items-center gap-1 uppercase tracking-wider font-bold"
                   >
                     <User size={10} /> Details
@@ -445,46 +437,191 @@ const MemberList = () => {
       {/* Details Modal */}
       {detailsModal.show && detailsModal.member && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col animate-in zoom-in duration-300">
-            <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
-              <h2 className="text-xl font-bold flex items-center gap-2"><User size={20} /> Member Profile</h2>
-              <button onClick={() => setDetailsModal({ show: false, member: null })} className="p-1 hover:bg-slate-700 rounded-full transition"><X size={20} /></button>
+          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col animate-in zoom-in duration-300 max-h-[90vh]">
+            {/* Header */}
+            <div className="p-6 bg-slate-900 text-white flex justify-between items-center flex-shrink-0">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <User size={20} />
+                {isEditMode ? 'Edit Member' : 'Member Profile'}
+              </h2>
+              <div className="flex items-center gap-2">
+                {!isEditMode && (
+                  <button
+                    onClick={() => startEdit(detailsModal.member)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition"
+                  >
+                    <Pencil size={13} /> Edit
+                  </button>
+                )}
+                <button onClick={() => { setDetailsModal({ show: false, member: null }); setIsEditMode(false); }} className="p-1 hover:bg-slate-700 rounded-full transition">
+                  <X size={20} />
+                </button>
+              </div>
             </div>
-            <div className="p-8 space-y-4">
-              <div className="flex items-center gap-6 mb-6 pb-6 border-b border-slate-100">
+
+            <div className="p-6 overflow-y-auto">
+              {/* Photo + Status */}
+              <div className="flex items-center gap-5 mb-6 pb-6 border-b border-slate-100">
                 <img
-                  src={detailsModal.member.photo ? (detailsModal.member.photo.startsWith('http') ? detailsModal.member.photo : detailsModal.member.photo) : 'https://via.placeholder.com/100'}
+                  src={detailsModal.member.photo || 'https://via.placeholder.com/100'}
                   crossOrigin={detailsModal.member.photo ? "anonymous" : undefined}
-                  className="w-24 h-24 rounded-2xl object-cover border-4 border-slate-50 shadow-sm"
+                  className="w-20 h-20 rounded-2xl object-cover border-4 border-slate-50 shadow-sm"
                   alt="Profile"
                 />
                 <div>
-                  <h3 className="text-2xl font-black text-slate-900">{detailsModal.member.fullName}</h3>
-                  <span className={`inline-block px-3 py-1 mt-2 text-xs font-bold uppercase tracking-widest rounded-full ${detailsModal.member.membershipStatus === 'Valid' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                  <h3 className="text-xl font-black text-slate-900">
+                    {isEditMode ? editForm.fullName : detailsModal.member.fullName}
+                  </h3>
+                  <span className={`inline-block px-3 py-1 mt-1 text-xs font-bold uppercase tracking-widest rounded-full ${detailsModal.member.membershipStatus === 'Valid' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                     {detailsModal.member.membershipStatus}
                   </span>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                {[
-                  { label: 'Phone Number', value: detailsModal.member.phone },
-                  { label: 'Gender', value: detailsModal.member.gender || 'Male' },
-                  { label: 'WhatsApp', value: detailsModal.member.whatsapp || 'N/A' },
-                  { label: 'Email Address', value: detailsModal.member.email || 'N/A' },
-                  { label: 'Category', value: detailsModal.member.memberCategory || 'General' },
-                  { label: 'Package Type', value: detailsModal.member.packageType || 'N/A' },
-                  { label: 'Expiry Date', value: detailsModal.member.expiryDate ? new Date(detailsModal.member.expiryDate).toLocaleDateString('en-GB') : 'N/A' },
-                ].map(item => (
-                  <div key={item.label} className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.label}</p>
-                    <p className="font-bold text-slate-800 truncate">{item.value}</p>
-                  </div>
-                ))}
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 col-span-2">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Registered On</p>
-                  <p className="font-bold text-slate-800">{new Date(detailsModal.member.createdAt).toLocaleDateString('en-GB')}</p>
+
+              {!isEditMode ? (
+                /* ─── VIEW MODE ─── */
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: 'Phone Number', value: detailsModal.member.phone },
+                    { label: 'Gender', value: detailsModal.member.gender || 'Male' },
+                    { label: 'WhatsApp', value: detailsModal.member.whatsapp || 'N/A' },
+                    { label: 'Email Address', value: detailsModal.member.email || 'N/A' },
+                    { label: 'Category', value: detailsModal.member.memberCategory || 'General' },
+                    { label: 'Package Type', value: detailsModal.member.packageType || 'N/A' },
+                    { label: 'Expiry Date', value: detailsModal.member.expiryDate ? new Date(detailsModal.member.expiryDate).toLocaleDateString('en-GB') : 'N/A' },
+                    { label: 'Registered On', value: detailsModal.member.registrationDate ? new Date(detailsModal.member.registrationDate).toLocaleDateString('en-GB') : new Date(detailsModal.member.createdAt).toLocaleDateString('en-GB') },
+                  ].map(item => (
+                    <div key={item.label} className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.label}</p>
+                      <p className="font-bold text-slate-800 truncate text-sm">{item.value}</p>
+                    </div>
+                  ))}
                 </div>
-              </div>
+              ) : (
+                /* ─── EDIT MODE ─── */
+                <div className="space-y-4">
+                  {/* Full Name */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">Full Name</label>
+                    <input
+                      type="text"
+                      value={editForm.fullName}
+                      onChange={e => setEditForm(p => ({ ...p, fullName: e.target.value }))}
+                      className="w-full p-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 outline-none font-bold text-slate-800"
+                    />
+                  </div>
+
+                  {/* Gender */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">Gender</label>
+                    <div className="relative">
+                      <select
+                        value={editForm.gender}
+                        onChange={e => setEditForm(p => ({ ...p, gender: e.target.value }))}
+                        className="w-full p-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 outline-none font-bold text-slate-800 appearance-none bg-white"
+                      >
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                      </select>
+                      <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  {/* Phone (read-only) */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-1">Phone Number <span className="text-slate-300">(cannot change)</span></label>
+                    <input
+                      type="text"
+                      value={editForm.phone}
+                      disabled
+                      className="w-full p-3 rounded-xl border-2 border-slate-100 bg-slate-50 font-bold text-slate-400 cursor-not-allowed"
+                    />
+                  </div>
+
+                  {/* WhatsApp */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">WhatsApp Number</label>
+                    <input
+                      type="text"
+                      value={editForm.whatsapp}
+                      onChange={e => setEditForm(p => ({ ...p, whatsapp: e.target.value }))}
+                      className="w-full p-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 outline-none font-bold text-slate-800"
+                    />
+                  </div>
+
+                  {/* Category */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">Category</label>
+                    <div className="relative">
+                      <select
+                        value={editForm.memberCategory}
+                        onChange={e => setEditForm(p => ({ ...p, memberCategory: e.target.value, packageType: '' }))}
+                        className="w-full p-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 outline-none font-bold text-slate-800 appearance-none bg-white"
+                      >
+                        {(settings?.pricing || []).map(c => (
+                          <option key={c.category} value={c.category}>{c.category}</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  {/* Package Type */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">Package Type</label>
+                    <div className="relative">
+                      <select
+                        value={editForm.packageType}
+                        onChange={e => setEditForm(p => ({ ...p, packageType: e.target.value }))}
+                        className="w-full p-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 outline-none font-bold text-slate-800 appearance-none bg-white"
+                      >
+                        {getPackagesForMember(editForm.memberCategory).map(pkg => (
+                          <option key={pkg.name} value={pkg.name}>{pkg.name}</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  {/* Registered On */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">Registered On</label>
+                    <input
+                      type="date"
+                      value={editForm.registrationDate}
+                      onChange={e => setEditForm(p => ({ ...p, registrationDate: e.target.value }))}
+                      className="w-full p-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 outline-none font-bold text-slate-800"
+                    />
+                  </div>
+
+                  {/* Expiry Preview (auto) */}
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                    <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Expiry Date (Auto-Calculated)</p>
+                    <p className="font-black text-amber-800 text-sm mt-0.5">
+                      {calcPreviewExpiry() || '— Select package & date —'}
+                    </p>
+                  </div>
+
+                  {/* Buttons */}
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      onClick={() => setIsEditMode(false)}
+                      className="flex-1 p-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleEditMember}
+                      disabled={editLoading}
+                      className="flex-1 p-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      <Save size={16} />
+                      {editLoading ? 'Saving...' : 'Save Changes'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -525,156 +662,8 @@ const MemberList = () => {
           </div>
         </div>
       )}
-      
-      {/* Future Edit Modal can be added here, similar to the above modals with a form to edit member details */ }
-      {editModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl animate-in fade-in zoom-in duration-300">
-            {/* Edit form content goes here */}
-            <button onClick={() => setEditModal(null)} className="absolute top-4 right-4 p-2 bg-slate-100 rounded-full hover:bg-slate-200"><X size={20} /></button>
-            <h2 className="text-xl font-bold mb-6 text-center">Edit Member Details</h2>
-            {/* Form fields for editing member details would go here */}
-          </div>
-        </div>
-      )}
-
-      {/* Edit Modal */}
-      {editModal.show && editModal.member && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl animate-in fade-in zoom-in duration-300 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-slate-900">Edit Member Details</h2>
-              <button 
-                onClick={() => { setEditModal({ show: false, member: null }); }}
-                className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {/* Full Name */}
-              <div>
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-widest">Full Name *</label>
-                <input
-                  type="text"
-                  value={editForm.fullName}
-                  onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
-                  placeholder="Enter full name"
-                  className="w-full mt-1 p-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 outline-none font-semibold"
-                />
-              </div>
-
-              {/* Email */}
-              <div>
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-widest">Email Address</label>
-                <input
-                  type="email"
-                  value={editForm.email}
-                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                  placeholder="Enter email address"
-                  className="w-full mt-1 p-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 outline-none font-semibold"
-                />
-              </div>
-
-              {/* WhatsApp */}
-              <div>
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-widest">WhatsApp Number</label>
-                <input
-                  type="tel"
-                  value={editForm.whatsapp}
-                  onChange={(e) => setEditForm({ ...editForm, whatsapp: e.target.value })}
-                  placeholder="Enter WhatsApp number"
-                  className="w-full mt-1 p-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 outline-none font-semibold"
-                />
-              </div>
-
-              {/* Gender */}
-              <div>
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-widest">Gender</label>
-                <select
-                  value={editForm.gender}
-                  onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
-                  className="w-full mt-1 p-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 outline-none font-semibold"
-                >
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              {/* Member Category */}
-              <div>
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-widest">Member Category</label>
-                <select
-                  value={editForm.memberCategory}
-                  onChange={(e) => setEditForm({ ...editForm, memberCategory: e.target.value })}
-                  className="w-full mt-1 p-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 outline-none font-semibold"
-                >
-                  {settings?.pricing?.map(cat => (
-                    <option key={cat.category} value={cat.category}>
-                      {cat.category}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Package Type */}
-              <div>
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-widest">Package Type</label>
-                <select
-                  value={editForm.packageType}
-                  onChange={(e) => setEditForm({ ...editForm, packageType: e.target.value })}
-                  className="w-full mt-1 p-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 outline-none font-semibold"
-                >
-                  <option value="">Select a package</option>
-                  {getPackagesForMember(editForm.memberCategory).map(pkg => (
-                    <option key={pkg.name} value={pkg.name}>
-                      {pkg.name} - ₹{pkg.price}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Member ID (Read-only) */}
-              <div>
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-widest">Phone Number (ID - Read-only)</label>
-                <input
-                  type="text"
-                  value={editModal.member?.phone || ''}
-                  disabled
-                  className="w-full mt-1 p-3 rounded-xl border-2 border-slate-200 bg-slate-50 font-semibold text-slate-500"
-                />
-              </div>
-            </div>
-
-            {/* Buttons */}
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => { setEditModal({ show: false, member: null }); }}
-                className="flex-1 p-3 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveEdit}
-                disabled={editLoading}
-                className="flex-1 p-3 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {editLoading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Saving...
-                  </>
-                ) : (
-                  'Save Changes'
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
+
 export default MemberList;

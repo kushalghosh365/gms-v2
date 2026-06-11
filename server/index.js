@@ -1220,6 +1220,75 @@ app.post('/api/members/register-old', upload.single('photo'), async (req, res) =
 });
 
 // =============================================
+// EDIT MEMBER (only changed fields)
+// =============================================
+app.put('/api/members/:id', async (req, res) => {
+    try {
+        const { fullName, gender, phone, whatsapp, memberCategory, packageType, registrationDate } = req.body;
+        const member = await Member.findByPk(req.params.id);
+        if (!member) return res.status(404).json({ message: 'Member not found' });
+
+        // Only update fields that were provided
+        if (fullName !== undefined) member.fullName = fullName;
+        if (gender !== undefined) member.gender = gender;
+        if (whatsapp !== undefined) member.whatsapp = whatsapp;
+        if (memberCategory !== undefined) member.memberCategory = memberCategory;
+
+        // If packageType or registrationDate changes, recalculate expiryDate
+        const newPackageType = packageType !== undefined ? packageType : member.packageType;
+        const newRegistrationDate = registrationDate !== undefined ? new Date(registrationDate) : (member.registrationDate || member.createdAt);
+
+        if (packageType !== undefined || registrationDate !== undefined) {
+            member.packageType = newPackageType;
+            member.registrationDate = newRegistrationDate;
+
+            // Get duration from settings
+            let durationDays = 30;
+            const settings = await Settings.findOne();
+            if (settings) {
+                const catConfig = settings.pricing.find(c => c.category === (member.memberCategory || 'General'));
+                if (catConfig) {
+                    const pack = catConfig.packages.find(p => p.name === newPackageType);
+                    if (pack) durationDays = pack.durationDays;
+                }
+            }
+
+            const newExpiry = new Date(newRegistrationDate);
+            newExpiry.setDate(newExpiry.getDate() + durationDays);
+            member.expiryDate = newExpiry;
+            member.membershipStatus = newExpiry > new Date() ? 'Valid' : 'Expired';
+        }
+
+        await member.save();
+        res.json({ message: 'Member updated successfully', member: mapRecord(member) });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// =============================================
+// EDIT STAFF (only changed fields)
+// =============================================
+app.put('/api/staff/:id', async (req, res) => {
+    try {
+        const { fullName, gender, phone, whatsapp, joiningDate, role } = req.body;
+        const staff = await Staff.findByPk(req.params.id);
+        if (!staff) return res.status(404).json({ message: 'Staff not found' });
+
+        if (fullName !== undefined) staff.fullName = fullName;
+        if (gender !== undefined) staff.gender = gender;
+        if (whatsapp !== undefined) staff.whatsapp = whatsapp;
+        if (joiningDate !== undefined) staff.joiningDate = joiningDate;
+        if (role !== undefined) staff.role = role;
+
+        await staff.save();
+        res.json({ message: 'Staff updated successfully', staff: mapRecord(staff) });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// =============================================
 // SOFT DELETE: Member (keeps fees & history)
 // =============================================
 app.delete('/api/members/:id', async (req, res) => {
@@ -1262,63 +1331,6 @@ app.delete('/api/staff/:id', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-//============================================
-//member & staff edit options
-//============================================
-/*
-edit options
-if photo is being updated, send it as multipart form data with key 'photo'
-other fields can be sent in JSON body as usual
-name, email, whatsapp, memberCategory, packageType, joiningDate,gender can be updated for members
-name, email, whatsapp, role, joiningDate,gender can be updated for staff
-*/
-
-// Edit Member
-
-app.put('/api/members/:id', upload.single('photo'), async (req, res) => {
-    try {
-        const member = await Member.findByPk(req.params.id);
-        if (!member) return res.status(404).json({ message: 'Member not found' });
-
-        const { fullName, email, whatsapp, memberCategory, packageType, joiningDate, gender } = req.body;
-        if (fullName) member.fullName = fullName;
-        if (email) member.email = email;
-        if (whatsapp) member.whatsapp = whatsapp;
-        if (memberCategory) member.memberCategory = memberCategory;
-        if (packageType) member.packageType = packageType;
-        if (joiningDate) member.joiningDate = joiningDate;
-        if (gender) member.gender = gender;
-
-        await member.save();
-        res.json({ message: 'Member updated successfully', member });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Edit Staff
-
-app.put('/api/staff/:id', upload.single('photo'), async (req, res) => {
-    try {
-        const staff = await Staff.findByPk(req.params.id);
-        if (!staff) return res.status(404).json({ message: 'Staff not found' });
-
-        const { fullName, email, whatsapp, role, joiningDate, gender } = req.body;
-        if (fullName) staff.fullName = fullName;
-        if (email) staff.email = email;
-        if (whatsapp) staff.whatsapp = whatsapp;
-        if (role) staff.role = role;
-        if (joiningDate) staff.joiningDate = joiningDate;
-        if (gender) staff.gender = gender;
-
-        await staff.save();
-        res.json({ message: 'Staff updated successfully', staff });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-
 
 // Helper function to run robust fail-safe migrations for TiDB
 async function runFailSafeMigrations() {

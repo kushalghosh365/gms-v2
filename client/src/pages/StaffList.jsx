@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
-import { Search, Phone, Briefcase, CheckCircle, XCircle, LogIn, LogOut, Clock, CalendarX2, Monitor, X, Download, Lock, User, Trash2, Send } from 'lucide-react';
+import { Search, Phone, Briefcase, CheckCircle, XCircle, LogIn, LogOut, Clock, CalendarX2, Monitor, X, Download, Lock, User, Trash2, Send, Pencil, Save, ChevronDown } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import html2canvas from 'html2canvas';
 
@@ -14,6 +14,9 @@ const StaffList = () => {
 
   const [qrModal, setQrModal] = useState({ show: false, member: null });
   const [detailsModal, setDetailsModal] = useState({ show: false, staff: null });
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editForm, setEditForm] = useState({});
+  const [editLoading, setEditLoading] = useState(false);
   const cardRef = useRef(null);
 
   // Delete modal state
@@ -72,7 +75,52 @@ const StaffList = () => {
     }
   };
 
+  const openStaffDetails = (s) => {
+    setDetailsModal({ show: true, staff: s });
+    setIsEditMode(false);
+    setEditForm({});
+  };
 
+  const startStaffEdit = (s) => {
+    setIsEditMode(true);
+    setEditForm({
+      fullName: s.fullName || '',
+      gender: s.gender || 'Male',
+      phone: s.phone || '',
+      whatsapp: s.whatsapp || '',
+      joiningDate: s.joiningDate || '',
+      role: s.role || '',
+    });
+  };
+
+  const handleEditStaff = async () => {
+    setEditLoading(true);
+    try {
+      const original = detailsModal.staff;
+      const payload = {};
+      if (editForm.fullName !== original.fullName) payload.fullName = editForm.fullName;
+      if (editForm.gender !== (original.gender || 'Male')) payload.gender = editForm.gender;
+      if (editForm.whatsapp !== (original.whatsapp || '')) payload.whatsapp = editForm.whatsapp;
+      if (editForm.joiningDate !== (original.joiningDate || '')) payload.joiningDate = editForm.joiningDate;
+      if (editForm.role !== (original.role || '')) payload.role = editForm.role;
+
+      if (Object.keys(payload).length === 0) {
+        setIsEditMode(false);
+        setEditLoading(false);
+        return;
+      }
+
+      const res = await axios.put(`/api/staff/${original._id}`, payload);
+      const updatedStaff = res.data.staff;
+      setDetailsModal({ show: true, staff: updatedStaff });
+      setIsEditMode(false);
+      fetchStaff();
+    } catch (err) {
+      alert('Error: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setEditLoading(false);
+    }
+  };
 
   const downloadQRCard = () => {
     if (cardRef.current) {
@@ -316,7 +364,7 @@ const StaffList = () => {
                         <h3 className="font-black text-xl text-slate-900 leading-tight flex items-center flex-wrap gap-2">
                           {s.fullName}
                           <button
-                            onClick={() => setDetailsModal({ show: true, staff: s })}
+                            onClick={() => openStaffDetails(s)}
                             className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded-full hover:bg-indigo-100 hover:text-indigo-600 transition flex items-center gap-1 uppercase tracking-wider font-bold"
                           >
                             <User size={10} /> Details
@@ -501,53 +549,158 @@ const StaffList = () => {
       {/* View Details Modal for Staff */}
       {detailsModal.show && detailsModal.staff && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col animate-in zoom-in duration-300">
-            <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
-              <h2 className="text-xl font-bold flex items-center gap-2"><User size={20} /> Staff Profile</h2>
-              <button onClick={() => setDetailsModal({ show: false, staff: null })} className="p-1 hover:bg-slate-700 rounded-full transition"><X size={20} /></button>
+          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col animate-in zoom-in duration-300 max-h-[90vh]">
+            {/* Header */}
+            <div className="p-6 bg-slate-900 text-white flex justify-between items-center flex-shrink-0">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <User size={20} />
+                {isEditMode ? 'Edit Staff' : 'Staff Profile'}
+              </h2>
+              <div className="flex items-center gap-2">
+                {!isEditMode && (
+                  <button
+                    onClick={() => startStaffEdit(detailsModal.staff)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition"
+                  >
+                    <Pencil size={13} /> Edit
+                  </button>
+                )}
+                <button onClick={() => { setDetailsModal({ show: false, staff: null }); setIsEditMode(false); }} className="p-1 hover:bg-slate-700 rounded-full transition">
+                  <X size={20} />
+                </button>
+              </div>
             </div>
-            <div className="p-8 space-y-4">
-              <div className="flex items-center gap-6 mb-6 pb-6 border-b border-slate-100">
+
+            <div className="p-6 overflow-y-auto">
+              {/* Photo + Role */}
+              <div className="flex items-center gap-5 mb-6 pb-6 border-b border-slate-100">
                 <img
-                  src={detailsModal.staff.photo ? (detailsModal.staff.photo.startsWith("http") ? detailsModal.staff.photo : detailsModal.staff.photo) : 'https://via.placeholder.com/100'}
+                  src={detailsModal.staff.photo || 'https://via.placeholder.com/100'}
                   crossOrigin={detailsModal.staff.photo ? "anonymous" : undefined}
-                  className="w-24 h-24 rounded-2xl object-cover border-4 border-slate-50 shadow-sm"
+                  className="w-20 h-20 rounded-2xl object-cover border-4 border-slate-50 shadow-sm"
                   alt="Profile"
                 />
                 <div>
-                  <h3 className="text-2xl font-black text-slate-900">{detailsModal.staff.fullName}</h3>
-                  <span className="inline-block px-3 py-1 mt-2 text-xs font-bold uppercase tracking-widest rounded-full bg-indigo-100 text-indigo-700">
-                    {detailsModal.staff.role}
+                  <h3 className="text-xl font-black text-slate-900">
+                    {isEditMode ? editForm.fullName : detailsModal.staff.fullName}
+                  </h3>
+                  <span className="inline-block px-3 py-1 mt-1 text-xs font-bold uppercase tracking-widest rounded-full bg-indigo-100 text-indigo-700">
+                    {isEditMode ? editForm.role : detailsModal.staff.role}
                   </span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Phone Number</p>
-                  <p className="font-bold text-slate-800">{detailsModal.staff.phone}</p>
+              {!isEditMode ? (
+                /* ─── VIEW MODE ─── */
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: 'Phone Number', value: detailsModal.staff.phone },
+                    { label: 'Gender', value: detailsModal.staff.gender || 'Male' },
+                    { label: 'WhatsApp', value: detailsModal.staff.whatsapp || 'N/A' },
+                    { label: 'Email Address', value: detailsModal.staff.email || 'N/A' },
+                    { label: 'Joining Date', value: detailsModal.staff.joiningDate ? new Date(detailsModal.staff.joiningDate).toLocaleDateString('en-GB') : 'N/A' },
+                    { label: 'Registered On', value: new Date(detailsModal.staff.createdAt).toLocaleDateString('en-GB') },
+                  ].map(item => (
+                    <div key={item.label} className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.label}</p>
+                      <p className="font-bold text-slate-800 truncate text-sm">{item.value}</p>
+                    </div>
+                  ))}
                 </div>
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Gender</p>
-                  <p className="font-bold text-slate-800">{detailsModal.staff.gender || 'Male'}</p>
+              ) : (
+                /* ─── EDIT MODE ─── */
+                <div className="space-y-4">
+                  {/* Full Name */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">Full Name</label>
+                    <input
+                      type="text"
+                      value={editForm.fullName}
+                      onChange={e => setEditForm(p => ({ ...p, fullName: e.target.value }))}
+                      className="w-full p-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 outline-none font-bold text-slate-800"
+                    />
+                  </div>
+
+                  {/* Gender */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">Gender</label>
+                    <div className="relative">
+                      <select
+                        value={editForm.gender}
+                        onChange={e => setEditForm(p => ({ ...p, gender: e.target.value }))}
+                        className="w-full p-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 outline-none font-bold text-slate-800 appearance-none bg-white"
+                      >
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                      </select>
+                      <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  {/* Phone (read-only) */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-1">Phone Number <span className="text-slate-300">(cannot change)</span></label>
+                    <input
+                      type="text"
+                      value={editForm.phone}
+                      disabled
+                      className="w-full p-3 rounded-xl border-2 border-slate-100 bg-slate-50 font-bold text-slate-400 cursor-not-allowed"
+                    />
+                  </div>
+
+                  {/* WhatsApp */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">WhatsApp Number</label>
+                    <input
+                      type="text"
+                      value={editForm.whatsapp}
+                      onChange={e => setEditForm(p => ({ ...p, whatsapp: e.target.value }))}
+                      className="w-full p-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 outline-none font-bold text-slate-800"
+                    />
+                  </div>
+
+                  {/* Joining Date */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">Joining Date</label>
+                    <input
+                      type="date"
+                      value={editForm.joiningDate ? new Date(editForm.joiningDate).toISOString().split('T')[0] : ''}
+                      onChange={e => setEditForm(p => ({ ...p, joiningDate: e.target.value }))}
+                      className="w-full p-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 outline-none font-bold text-slate-800"
+                    />
+                  </div>
+
+                  {/* Role */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">Role / Designation</label>
+                    <input
+                      type="text"
+                      value={editForm.role}
+                      onChange={e => setEditForm(p => ({ ...p, role: e.target.value }))}
+                      className="w-full p-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 outline-none font-bold text-slate-800"
+                    />
+                  </div>
+
+                  {/* Buttons */}
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      onClick={() => setIsEditMode(false)}
+                      className="flex-1 p-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleEditStaff}
+                      disabled={editLoading}
+                      className="flex-1 p-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      <Save size={16} />
+                      {editLoading ? 'Saving...' : 'Save Changes'}
+                    </button>
+                  </div>
                 </div>
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">WhatsApp</p>
-                  <p className="font-bold text-slate-800">{detailsModal.staff.whatsapp || 'N/A'}</p>
-                </div>
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 col-span-2">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Email Address</p>
-                  <p className="font-bold text-slate-800 truncate">{detailsModal.staff.email || 'N/A'}</p>
-                </div>
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Joining Date</p>
-                  <p className="font-bold text-slate-800">{detailsModal.staff.joiningDate ? new Date(detailsModal.staff.joiningDate).toLocaleDateString('en-GB') : 'N/A'}</p>
-                </div>
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Registered On</p>
-                  <p className="font-bold text-slate-800">{new Date(detailsModal.staff.createdAt).toLocaleDateString('en-GB')}</p>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
